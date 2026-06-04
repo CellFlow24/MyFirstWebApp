@@ -23,13 +23,15 @@ public class Main {
 
         initializeDatabase(userDatabase, establishedConnections, chatHistories);
 
+// --- UPDATED CONFIGURATION ---
         Javalin app = Javalin.create(config -> {
-            config.staticFiles.add("/", Location.CLASSPATH);
+            // Tells Javalin to look for static files (HTML/CSS/JS) 
+            // inside src/main/resources/public
+            config.staticFiles.add("/public", Location.CLASSPATH);
         });
 
-        // --- FIXED: ROUTING & PORT CONFIGURATION ---
-        
         // Redirects root to your dashboard
+        // Ensure index.html is located in src/main/resources/public/index.html
         app.get("/", ctx -> ctx.redirect("/index.html"));
 
         // --- API CHANNELS ---
