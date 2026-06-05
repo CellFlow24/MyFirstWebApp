@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #0f172a;
+            background-color: #808080;
             color: #f8fafc;
             display: flex;
             justify-content: center;
@@ -242,6 +242,7 @@
             font-size: 14px;
             line-height: 1.4;
             word-wrap: break-word;
+            text-align: left; /* 🎯 THE FIX: Overrides global center alignment */
             animation: slideInUp 0.2s ease-out forwards;
         }
         /* Quick Emoji Selection Drawer Styling Layout */
@@ -397,10 +398,40 @@
                 position: relative !important;
                 z-index: 30 !important;
             }
-
             input[type="text"] {
                 font-size: 16px !important;
+                flex: 1 !important;        /* Takes up all available space */
+                min-width: 0 !important;   /* Allows it to shrink safely */
             }
+
+            /* 🎯 Round Background with Tilted Arrow (Mobile Phone) */
+            .chat-footer-input-bar .sync-btn {
+                width: 42px !important;
+                height: 42px !important;
+                padding: 0 !important;
+                border-radius: 50% !important;
+                background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important; /* Restores background */
+                color: white !important; /* White arrow for clean contrast */
+                flex-shrink: 0 !important;
+                margin-right: 5px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            #mobileSendBtn{
+                margin-right: 25px !important;
+            }
+        }
+
+        /* 🚫 Hide the ugly default scrollbar arrows inside the typing box */
+        #msgInputField::-webkit-scrollbar {
+            display: none; /* Hides the scrollbar in Chrome, Safari, and Edge */
+        }
+
+        #msgInputField {
+            -ms-overflow-style: none;  /* Hides the scrollbar in older IE/Edge */
+            scrollbar-width: none;     /* Hides the scrollbar in Firefox */
         }
     </style>
 </head>
@@ -728,12 +759,17 @@
                             <span onclick="injectEmojiToken('😘')">😘</span>
                         </div>
 
-                        <div class="chat-footer-input-bar" style="display:flex; align-items:center; gap:8px; padding:12px; background:#1e293b; border-top:1px solid #334155;">
+                        <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#1e293b; border-top:1px solid #334155;">
+
                             <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
-                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">📎</button>
-                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😀</button>
-                            <input type="text" id="msgInputField" placeholder="Type a message..." style="flex:1; padding:12px; border-radius:6px; background:#0f172a; border:1px solid #334155; color:white;" onkeydown="handleChatKeyDown(event)">
-                            <button class="sync-btn" style="background:#3b82f6; border:none; color:white; padding:12px 20px; border-radius:6px; font-weight:600; cursor:pointer;" onclick="triggerMessageDispatch()">Send</button>
+
+                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">📎</button>
+                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😀</button>
+
+                            <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#1e293b; border:1px solid #334155; color:white; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
+
+                            <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
+
                         </div>
                     </div>
                 `;
@@ -884,7 +920,9 @@
     }
 
     function handleChatKeyDown(event) {
-        if (event.key === 'Enter') {
+        // 🎯 FIX: Send on Enter, but allow Shift + Enter for a new structural line
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Stops the textarea from creating a blank new line
             triggerMessageDispatch();
         }
     }
@@ -893,11 +931,17 @@
         const inputField = document.getElementById('msgInputField');
         if(!inputField) return;
 
-        const messageContent = inputField.value.trim();
+        let messageContent = inputField.value.trim();
         if(!messageContent || !activeChatTarget) return;
 
+        // 🎯 THE FIX: Convert literal Enters into HTML line breaks.
+        // This keeps the whole message on one line in the database so the parser doesn't break.
+        messageContent = messageContent.replace(/\n/g, "<br>");
+
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
         inputField.value = "";
+        inputField.style.height = "45px";
 
         fetch(`/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
             method: 'POST',
