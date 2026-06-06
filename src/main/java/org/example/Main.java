@@ -11,7 +11,7 @@ import io.javalin.http.staticfiles.Location;
 public class Main {
 
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
-    private static final String DB_URL = "jdbc:sqlite::memory:";
+    private static final String DB_URL = "jdbc:sqlite:chatlounge.db";
 
     public static void main(String[] args) {
         HashMap<String, String> userDatabase = new HashMap<>();
