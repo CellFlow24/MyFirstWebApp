@@ -498,6 +498,7 @@
             filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); /* Adds a soft lime-green glow behind it! */
         }
     </style>
+    <link rel="manifest" href="/manifest.json">
 </head>
 <body>
 <div class="app-card" id="loginCard">
@@ -1103,6 +1104,15 @@
         // Slide the user list right back into view
         document.body.classList.remove('mobile-chat-view-engaged');
     }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker successfully registered!', reg))
+        .catch(err => console.error('Service worker registration failed:', err));
+    });
+  }
 </script>
 </body>
 </html>
