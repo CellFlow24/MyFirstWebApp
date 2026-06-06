@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dipsum-v2'; // Changed to v2 to force an update
+const CACHE_NAME = 'dipsum-v3'; 
 const ASSETS = [
   '/index.html',
   '/dipsum-logo.png',
@@ -27,9 +27,14 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: Network-First Strategy
+// Fetch: Network-First Strategy with API Bypass
 self.addEventListener('fetch', event => {
-  // Only intercept basic web requests, let APIs and POSTs pass through normally
+  // 🚨 NEW: Completely bypass the Service Worker for backend API calls
+  if (event.request.url.includes('/api/')) {
+    return; // Let the browser communicate natively with the Java backend
+  }
+
+  // Only intercept basic web page assets
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
