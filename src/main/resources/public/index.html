@@ -809,44 +809,44 @@
 
                     // Inject the UI along with a dynamic "← Back" button engine for phone view screens
                     loungeMain.innerHTML = `
-                    <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
-                        <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
+                <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                    <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
 
-                            <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
+                        <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
 
-                            ${headerAvatarHtml}
-                            <div class="header-meta-box">
-                                <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px;">${capitalizeFirstLetter(targetUsername)}</div>
-                                <span style="font-size:12px; color:#22c55e; font-weight:500;">Secure Channel Active</span>
-                            </div>
-                        </div>
-
-                        <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background:#baa2a0;"></div>
-
-                        <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
-                            <span onclick="injectEmojiToken('😀')">😀</span>
-                            <span onclick="injectEmojiToken('👍')">👍</span>
-                            <span onclick="injectEmojiToken('❤️')">❤️</span>
-                            <span onclick="injectEmojiToken('🥰')">🥰</span>
-                            <span onclick="injectEmojiToken('🌹')">🌹</span>
-                            <span onclick="injectEmojiToken('💖')">💖</span>
-                            <span onclick="injectEmojiToken('😘')">😘</span>
-                        </div>
-
-                        <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
-
-                            <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
-
-                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
-                            <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
-
-                            <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
-
-                            <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
-
+                        ${headerAvatarHtml}
+                        <div class="header-meta-box">
+                            <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px;">${capitalizeFirstLetter(targetUsername)}</div>
+                            <span style="font-size:12px; color:#22c55e; font-weight:500;">Secure Channel Active</span>
                         </div>
                     </div>
-                `;
+
+                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background:#baa2a0;"></div>
+
+                    <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
+                        <span onclick="injectEmojiToken('😀')">😀</span>
+                        <span onclick="injectEmojiToken('👍')">👍</span>
+                        <span onclick="injectEmojiToken('❤️')">❤️</span>
+                        <span onclick="injectEmojiToken('🥰')">🥰</span>
+                        <span onclick="injectEmojiToken('🌹')">🌹</span>
+                        <span onclick="injectEmojiToken('💖')">💖</span>
+                        <span onclick="injectEmojiToken('😘')">😘</span>
+                    </div>
+
+                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
+
+                        <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
+
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
+
+                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
+
+                        <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
+
+                    </div>
+                </div>
+            `;
 
                     // Add conditional rule to display mobile button natively on small screens
                     if(window.innerWidth <= 768) {
@@ -857,14 +857,23 @@
                     // 🎯 TRANSITION TOGGLE: Slide chat into focus on mobile devices by tracking body state
                     document.body.classList.add('mobile-chat-view-engaged');
 
+                    // 📱 KEYBOARD ANCHOR: Detects keyboard layout shifts and forces bottom scroll alignment
+                    const activeChatLog = document.getElementById('chatLogDisplay');
+                    if (activeChatLog) {
+                        const keyboardResizeObserver = new ResizeObserver(() => {
+                            activeChatLog.scrollTop = activeChatLog.scrollHeight;
+                        });
+                        keyboardResizeObserver.observe(activeChatLog);
+                    }
+
                     fetchActiveChatMessages(user, targetUsername);
                 } else {
                     displaySystemAlert("Security Access Violation", `You do not have an active secure transmission channel opened with ${capitalizeFirstLetter(targetUsername)}. Please send a chat invitation first.`, "🔒");
                 }
             })
             .catch(err => console.error("Error executing security header gateway sync:", err));
-    }
-
+    }   
+    
     // 💬 Function 2: Fetches history from the Java server maps and renders bubbles correctly
     function fetchActiveChatMessages(currentUser, targetUser) {
         fetch(`/api/getMessages?from=${encodeURIComponent(currentUser)}&to=${encodeURIComponent(targetUser)}`)
