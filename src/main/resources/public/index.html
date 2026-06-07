@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Enterprise Control Dashboard</title>
     <style>
         /*
@@ -347,22 +347,29 @@
         /* 📱 SAFE UNIVERSAL RESPONSIVE OVERRIDES */
         @media screen and (max-width: 768px) {
 
-            /* 1. Only override body alignment on small mobile viewports */
-            body {
+            /* 1. Add html, body fixed positioning and dvh */
+            html, body {
                 display: block !important;
-                height: 100vh !important;
+                height: 100dvh !important; /* 'dvh' adjusts dynamically when keyboard opens */
                 width: 100vw !important;
                 overflow: hidden !important;
+                position: fixed !important; /* Stops iOS from dragging the whole page up */
+                top: 0;
+                left: 0;
             }
 
             /* 2. Keeps login card centered in mobile viewport */
             .app-card {
                 margin: 0 !important;
-                width: 90% !important; /* Makes it look better on phones */
+                width: 90% !important;
                 max-width: 360px !important;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%); /* Perfectly centers it even when keyboard is up */
             }
 
-            /* 3. Force the lounge window to adapt strictly to the available screen size */
+            /* 3. Force the lounge window to adapt strictly to the dynamic screen size */
             .lounge-container {
                 position: fixed !important;
                 top: 0 !important;
@@ -370,13 +377,13 @@
                 left: 0 !important;
                 right: 0 !important;
                 width: 100vw !important;
-                height: 100% !important;
+                height: 100dvh !important; /* 'dvh' forces it to fit perfectly above the keyboard */
                 max-width: 100vw !important;
                 border-radius: 0px !important;
                 margin: 0 !important;
                 box-shadow: none !important;
                 overflow: hidden !important;
-                background-color: #fffdf5 !important; /* Maintain background color on mobile */
+                background-color: #fffdf5 !important;
             }
 
             /* 4. Directory panel stretches full-screen */
