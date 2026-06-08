@@ -504,6 +504,36 @@
             animation: softBreathe 3.5s ease-in-out infinite;
             filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); /* Adds a soft lime-green glow behind it! */
         }
+
+        /* 🟢 DOUBLE SIZE ROUND HEADER STATUS INDICATOR WRAPPER */
+        .status-round-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px; /* Adjusted spacing for the larger element */
+        }
+
+        /* Rounded image sizing scaled up to double (28px) */
+        .status-round-indicator {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Vibrant glowing pulse when active user is online */
+        .status-round-indicator.online {
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+            animation: statusRoundPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes statusRoundPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.12); opacity: 0.85; }
+            100% { transform: scale(1); opacity: 1; }
+        }
     </style>
     <link rel="manifest" href="/manifest.json">
 </head>
@@ -781,6 +811,15 @@
         let matchedRow = activeUserRows.find(row => row.innerHTML.toLowerCase().includes(targetUsername));
         let activeChatAvatarPayload = (matchedRow && matchedRow.dataset.avatarData) ? matchedRow.dataset.avatarData : "NONE";
 
+        // 🕵️ True Status Verification Check: Reads live setup from left sidebar indicator
+        let isTargetOnline = false;
+        if (matchedRow) {
+            const statusDot = matchedRow.querySelector('.status-dot');
+            if (statusDot && statusDot.classList.contains('status-online')) {
+                isTargetOnline = true;
+            }
+        }
+
         fetch(`/api/checkConnection?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUsername)}`)
             .then(res => res.text())
             .then(isAllowed => {
@@ -807,6 +846,11 @@
                         headerAvatarHtml = `<div class="header-dp-avatar" style="margin-right:12px; background:#2563eb; color:white; font-weight:bold; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">${targetUsername.charAt(0).toUpperCase()}</div>`;
                     }
 
+                    // Generates initial status indicator based on live dynamic data match
+                    const initialStatusIconHtml = isTargetOnline
+                        ? `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`
+                        : `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+
                     // Inject the UI along with a dynamic "← Back" button engine for phone view screens
                     loungeMain.innerHTML = `
                 <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
@@ -815,9 +859,12 @@
                         <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
 
                         ${headerAvatarHtml}
-                        <div class="header-meta-box">
+                        <div class="header-meta-box" style="display: flex; align-items: center; gap: 8px;">
                             <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px;">${capitalizeFirstLetter(targetUsername)}</div>
-                            <span style="font-size:12px; color:#22c55e; font-weight:500;">Secure Channel Active</span>
+
+                            <div id="userStatusWrapper" class="status-round-container">
+                                ${initialStatusIconHtml}
+                            </div>
                         </div>
                     </div>
 
@@ -1119,6 +1166,18 @@
 
         // Slide the user list right back into view
         document.body.classList.remove('mobile-chat-view-engaged');
+    }
+
+    // ⚡ Switches the top bar status round layout programmatically (Double Size version)
+    function updateHeaderUserStatusIndicator(isOnline) {
+        const wrapper = document.getElementById('userStatusWrapper');
+        if (!wrapper) return;
+
+        if (isOnline) {
+            wrapper.innerHTML = `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`;
+        } else {
+            wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+        }
     }
 </script>
 <script>
