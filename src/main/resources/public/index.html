@@ -6,17 +6,17 @@
     <title>Enterprise Control Dashboard</title>
     <style>
         /*
- * DIPSUM APP COLOR SCHEME - LOGO-INSPIRED CUTE-THEME UPDATE
- * (Colors sampled from the provided app logo for a complete visual refresh)
- *
- * MAIN PALETTE:
- * Light Mint Green (Backgrounds): #d1e49c
- * Warm Cream (Content Panels): #fffdf5
- * Lime Green (Primary Accents/Outgoing): #aad052
- * Pinkish Peach (Secondary Accents/Incoming): #ffc8b0
- * Dark Grey (Text on Cream): #334155
- * White (Contrast Text on Accents): #f8fafc
- */
+         * DIPSUM APP COLOR SCHEME - LOGO-INSPIRED CUTE-THEME UPDATE
+         * (Colors sampled from the provided app logo for a complete visual refresh)
+         *
+         * MAIN PALETTE:
+         * Light Mint Green (Backgrounds): #d1e49c
+         * Warm Cream (Content Panels): #fffdf5
+         * Lime Green (Primary Accents/Outgoing): #aad052
+         * Pinkish Peach (Secondary Accents/Incoming): #ffc8b0
+         * Dark Grey (Text on Cream): #334155
+         * White (Contrast Text on Accents): #f8fafc
+         */
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -134,6 +134,7 @@
             flex: 1; background: #ffc8b0; color: white; border: none; /* CHANGED: Decline button now uses the Pinkish Peach accent color */
             padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer;
         }
+
         /* Styling for Online/Offline indicator status circles */
         .status-dot {
             width: 10px;
@@ -156,6 +157,7 @@
             margin-left: 8px;
             display: inline-block;
         }
+
         /* Container framework for active messages layout */
         .chat-window-pane {
             display: flex;
@@ -164,13 +166,75 @@
             height: 100%;
             background-color: #fffdf5; /* CHANGED: Chat window main pane background changed to cream */
         }
+
+        /* WhatsApp-Style Premium Layout Header Components */
         .chat-header-bar {
-            padding: 15px 20px;
-            background-color: #fffdf5; /* CHANGED: Chat header panel changed to cream */
-            border-bottom: 1px solid #aad052; /* CHANGED: Subtle border for header changed to Lime Green */
-            text-align: left;
-            font-weight: 600;
+            padding: 10px 20px;
+            background-color: #fffdf5; /* Panel color is cream */
+            border-bottom: 1px solid #aad052; /* Header border changed to Lime Green */
+            display: flex;
+            align-items: center;
         }
+
+        .header-dp-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background-color: #fffdf5; /* CHANGED: Header avatar background changed to cream */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-right: 15px;
+            border: 2px solid #aad052;  /* CHANGED: Border color changed to Lime Green */
+            color: #aad052;
+        }
+
+        /* 🔄 VERTICAL STACK META-BOX FOR STATUS ON TOP */
+        .header-meta-box {
+            display: flex;
+            flex-direction: column-reverse; /* Force status-container above the title text */
+            align-items: flex-start;        /* Keep left-aligned */
+            gap: 4px;                       /* Comfortable space between elements */
+        }
+
+        .header-profile-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #334155;            /* CHANGED: Text color on cream changed to dark grey */
+            line-height: 1.2;
+        }
+
+        /* 🟢 DOUBLE SIZE ROUND HEADER STATUS INDICATOR WRAPPER (TOP LEVEL ELEMENT) */
+        .status-round-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px; /* Pulls slightly away from username text below */
+        }
+
+        /* Rounded image sizing scaled up to double (28px) */
+        .status-round-indicator {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Vibrant glowing pulse when active user is online */
+        .status-round-indicator.online {
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+            animation: statusRoundPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes statusRoundPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.12); opacity: 0.85; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         .chat-log-display {
             flex: 1;
             padding: 20px;
@@ -187,6 +251,12 @@
             gap: 12px;
         }
 
+        /* Smooth CSS Fade-In Animation for Newly Spawned Bubbles */
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* Chat bubble styling tokens */
         .msg-bubble {
             max-width: 65%;
@@ -195,6 +265,8 @@
             font-size: 14px;
             line-height: 1.4;
             word-wrap: break-word;
+            text-align: left; /* 🎯 THE FIX: Overrides global center alignment */
+            animation: slideInUp 0.2s ease-out forwards;
         }
         .msg-outgoing {
             background: linear-gradient(135deg, #aad052 0%, #c1df7e 100%); /* CHANGED: Outgoing bubbles now use a new Lime Green gradient */
@@ -208,6 +280,7 @@
             align-self: flex-start;
             border-bottom-left-radius: 2px;
         }
+
         /* Custom App-Wide Layout Adjustments */
         #userListContainer {
             max-height: calc(100vh - 200px); /* Restricts list height to force scrolling */
@@ -242,52 +315,6 @@
             color: #aad052;
         }
 
-        /* WhatsApp-Style Premium Layout Header Components */
-        .chat-header-bar {
-            padding: 10px 20px;
-            background-color: #fffdf5; /* Panel color is cream */
-            border-bottom: 1px solid #aad052; /* Header border changed to Lime Green */
-            display: flex;
-            align-items: center;
-        }
-        .header-dp-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background-color: #fffdf5; /* CHANGED: Header avatar background changed to cream */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            margin-right: 15px;
-            border: 2px solid #aad052;  /* CHANGED: Border color changed to Lime Green */
-            color: #aad052;
-        }
-        .header-meta-box {
-            display: flex;
-            flex-direction: column;
-        }
-        .header-profile-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #334155;            /* CHANGED: Text color on cream changed to dark grey */
-        }
-
-        /* Smooth CSS Fade-In Animation for Newly Spawned Bubbles */
-        @keyframes slideInUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .msg-bubble {
-            max-width: 65%;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 14px;
-            line-height: 1.4;
-            word-wrap: break-word;
-            text-align: left; /* 🎯 THE FIX: Overrides global center alignment */
-            animation: slideInUp 0.2s ease-out forwards;
-        }
         /* Quick Emoji Selection Drawer Styling Layout */
         .emoji-drawer-panel {
             display: flex;
@@ -493,6 +520,7 @@
             -ms-overflow-style: none;  /* Hides the scrollbar in older IE/Edge */
             scrollbar-width: none;     /* Hides the scrollbar in Firefox */
         }
+
         /* 🐾 Gentle floating animation for the Dipsum logo */
         @keyframes softBreathe {
             0% { transform: translateY(0px) scale(1); }
@@ -503,36 +531,6 @@
         .alive-logo {
             animation: softBreathe 3.5s ease-in-out infinite;
             filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); /* Adds a soft lime-green glow behind it! */
-        }
-
-        /* 🟢 DOUBLE SIZE ROUND HEADER STATUS INDICATOR WRAPPER */
-        .status-round-container {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-left: 6px; /* Adjusted spacing for the larger element */
-        }
-
-        /* Rounded image sizing scaled up to double (28px) */
-        .status-round-indicator {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            object-fit: cover;
-            display: block;
-            transition: all 0.3s ease-in-out;
-        }
-
-        /* Vibrant glowing pulse when active user is online */
-        .status-round-indicator.online {
-            box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
-            animation: statusRoundPulse 2s infinite ease-in-out;
-        }
-
-        @keyframes statusRoundPulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.12); opacity: 0.85; }
-            100% { transform: scale(1); opacity: 1; }
         }
     </style>
     <link rel="manifest" href="/manifest.json">
@@ -717,6 +715,12 @@
                         return;
                     }
 
+                    // ⚡ LIVE HEADER AUTO-SYNC ENGINE
+                    // If this looped contact matches the user we are currently actively viewing, refresh the indicator status immediately!
+                    if (cleanName === activeChatTarget) {
+                        updateHeaderUserStatusIndicator(isOnline);
+                    }
+
                     const row = document.createElement('div');
                     row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
 
@@ -740,18 +744,18 @@
                         actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
                     } else {
                         actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
-                                    onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
+                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
                     }
 
                     row.innerHTML = `
-                <div style="display: flex; align-items: center; position: relative;">
-                    <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
-                    ${dpContentHtml}
-                    <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
-                    ${unreadBadgeHtml}
-                </div>
-                ${actionComponentHtml}
-            `;
+            <div style="display: flex; align-items: center; position: relative;">
+                <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                ${dpContentHtml}
+                <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                ${unreadBadgeHtml}
+            </div>
+            ${actionComponentHtml}
+        `;
                     listContainer.appendChild(row);
                 });
             });
@@ -859,8 +863,9 @@
                         <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
 
                         ${headerAvatarHtml}
-                        <div class="header-meta-box" style="display: flex; align-items: center; gap: 8px;">
-                            <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px;">${capitalizeFirstLetter(targetUsername)}</div>
+
+                        <div class="header-meta-box">
+                            <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px; line-height: 1.2;">${capitalizeFirstLetter(targetUsername)}</div>
 
                             <div id="userStatusWrapper" class="status-round-container">
                                 ${initialStatusIconHtml}
