@@ -607,6 +607,11 @@
     let isSignUpMode = false;
     let activeChatTarget = null; // Globally records who you are currently looking at
     let currentLoadedMessageCount = 0; // Tracks message depth state to completely prevent layout flickering
+    // 🎵 DUAL NOTIFICATION SOUND ENGINE INITIALIZATION
+    let totalUnreadMessagesTracked = 0;
+
+    const backgroundChime = new Audio('tune1.mpeg'); // 📥 For background unread badge increases
+    const activeChatChime = new Audio('tune2.mpeg'); // 💬 For new messages sliding into the open chat
 
     // 🔍 PERSISTENT AUTO-LOGIN INITIALIZATION OVERLOAD
     window.addEventListener('DOMContentLoaded', () => {
@@ -715,6 +720,8 @@
                 listContainer.innerHTML = "";
                 if(!rawText || rawText.trim() === "") return;
 
+                let currentCycleUnreadSum = 0; // Tracks background activity total
+
                 // 🛠️ SAFE PARSING: Split users by $$$ and properties by ###
                 rawText.split('$$$').forEach(userToken => {
                     if (!userToken || userToken.trim() === "") return;
@@ -728,6 +735,9 @@
                     const relationshipStatus = parts[3].trim();
                     let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
                     const cleanName = targetUser.toLowerCase();
+
+                    // Accumulate overall background unread totals
+                    currentCycleUnreadSum += unreadCount;
 
                     if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
                         customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
@@ -746,7 +756,6 @@
                     }
 
                     // ⚡ LIVE HEADER AUTO-SYNC ENGINE
-                    // If this looped contact matches the user we are currently actively viewing, refresh the indicator status immediately!
                     if (cleanName === activeChatTarget) {
                         updateHeaderUserStatusIndicator(isOnline);
                     }
@@ -774,20 +783,26 @@
                         actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
                     } else {
                         actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
-                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
+                            onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
                     }
 
                     row.innerHTML = `
-            <div style="display: flex; align-items: center; position: relative;">
-                <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
-                ${dpContentHtml}
-                <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
-                ${unreadBadgeHtml}
-            </div>
-            ${actionComponentHtml}
-        `;
+                    <div style="display: flex; align-items: center; position: relative;">
+                        <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                        ${dpContentHtml}
+                        <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                        ${unreadBadgeHtml}
+                    </div>
+                    ${actionComponentHtml}
+                `;
                     listContainer.appendChild(row);
                 });
+
+                // 🔔 Trigger alert sound if background notifications count spikes upward
+                if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
+                    backgroundChime.play().catch(e => console.log("Audio playback pending user click handshake context."));
+                }
+                totalUnreadMessagesTracked = currentCycleUnreadSum;
             });
 
         if (activeChatTarget) {
@@ -964,7 +979,7 @@
                 const logBox = document.getElementById('chatLogDisplay');
                 if(!logBox) return;
 
-                // If the channel conversation history database array maps are completely empty
+                // If the conversation history database is completely empty
                 if(!data || data.trim() === "") {
                     logBox.innerHTML = "";
                     currentLoadedMessageCount = 0;
@@ -973,18 +988,18 @@
 
                 const incomingMessageTokens = data.split('\n');
 
-                // 🎯 THE FIX: If count is 0 (meaning we just switched tabs), wipe the screen layout clean to print the new text history
+                // 🎯 If count is 0 (switching chats), wipe layout clean to print text history
                 if (currentLoadedMessageCount === 0) {
                     logBox.innerHTML = "";
                 } else if (incomingMessageTokens.length === currentLoadedMessageCount) {
-                    // If message count matches what is already on screen, stop execution to prevent view rendering flicker
+                    // Return early if count matches to prevent visual screen flickering
                     return;
                 }
 
                 const isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
-
-                // Slice only the brand new pending messages to append
                 const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
+
+                let hasFreshIncomingMessage = false;
 
                 newPacketsToAppend.forEach(msgToken => {
                     const separatorIndex = msgToken.indexOf(':');
@@ -992,6 +1007,11 @@
 
                     const sender = msgToken.substring(0, separatorIndex);
                     let text = msgToken.substring(separatorIndex + 1);
+
+                    // Flag if a newly appended piece was sent by your contact
+                    if (sender !== currentUser) {
+                        hasFreshIncomingMessage = true;
+                    }
 
                     const bubble = document.createElement('div');
                     bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
@@ -1011,17 +1031,21 @@
                     logBox.appendChild(bubble);
                 });
 
+                // 🔔 Trigger audio if a brand new message from the other user was appended
+                if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) {
+                    activeChatChime.play().catch(e => console.log("Audio autoplay prevented."));
+                }
+
                 // Update global counter to the true state length
                 currentLoadedMessageCount = incomingMessageTokens.length;
 
-                // Keep the text container view window scrolled directly to the bottom line area
+                // Keep the container view window scrolled directly to the bottom line area
                 if (isScrolledToBottom || currentLoadedMessageCount === incomingMessageTokens.length) {
                     logBox.scrollTop = logBox.scrollHeight;
                 }
             })
             .catch(err => console.error("Error synchronizing active conversation state:", err));
     }
-
     function toggleEmojiDrawerOverlay() {
         const drawer = document.getElementById('emojiMiniDrawer');
         if(!drawer) return;
