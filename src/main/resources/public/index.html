@@ -675,13 +675,15 @@
                         displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
                         toggleAuthMode();
                     } else {
-                        // 💾 COMMIT VALID USER SESSION TO RUNTIME DISK STORAGE
-                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
-
                         document.getElementById('loginCard').style.display = 'none';
                         document.getElementById('chatLounge').style.display = 'flex';
                         document.getElementById('currentProfileName').innerText = username.toLowerCase();
+
+                        // 🔄 Start normal 2-second background sync cycle
                         startAppSynchronization();
+
+                        // 🔔 NEW: Trigger the Native Web Push permission handshake
+                        setupPushNotifications(username.toLowerCase());
                     }
                 } else {
                     displaySystemAlert("Authentication Failure", data, "❌");
@@ -692,7 +694,6 @@
                 displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
             });
     }
-
     // 🧼 SYSTEM APPMEMORY LOGOUT HANDLER ENGINE
     function executeAppLogout() {
         localStorage.removeItem('dipsum_logged_user');
@@ -1237,6 +1238,70 @@
         } else {
             wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
         }
+    }
+
+    function setupPushNotifications(username) {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            console.log("Native Push Notifications are not supported by this browser client.");
+            return;
+        }
+
+        // Request device OS authority to pop banners
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('OS Notification layer permission cleared successfully!');
+
+                navigator.serviceWorker.ready.then(registration => {
+                    // Check if this phone browser already has an active subscription token
+                    registration.pushManager.getSubscription().then(subscription => {
+                        if (subscription) {
+                            // Token exists, send it to backend to make sure it's up to date
+                            sendSubscriptionToServer(subscription, username);
+                            return subscription;
+                        }
+
+                        // 🔑 VAPID PUBLIC KEY PATHWAY PLACEHOLDER
+                        // (You will generate this string from your Java backend in the next step)
+                        const publicVapidKey = 'YOUR_PUBLIC_VAPID_KEY_HERE';
+                        const convertedApplicationKey = urlBase64ToUint8Array(publicVapidKey);
+
+                        // Register a fresh secure browser push endpoint address
+                        return registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: convertedApplicationKey
+                        }).then(newSubscription => {
+                            sendSubscriptionToServer(newSubscription, username);
+                        });
+                    }).catch(err => console.error("Could not register browser push properties:", err));
+                });
+            } else {
+                console.warn('System push notifications blocked by user device preferences.');
+            }
+        });
+    }
+
+    // Forward the Web Push payload token map directly to the Java backend database runtime
+    function sendSubscriptionToServer(subscription, username) {
+        fetch(`/api/saveSubscription?username=${encodeURIComponent(username)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+        })
+            .then(res => res.text())
+            .then(statusText => console.log("System Push Registration Sync status:", statusText))
+            .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
+    }
+
+    // Cryptographic utility wrapper: Converts VAPID keys to safe Uint8 array structures
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
     }
 </script>
 <script>
