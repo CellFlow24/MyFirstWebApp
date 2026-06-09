@@ -555,12 +555,16 @@
 
 <div id="chatLounge" class="lounge-container" style="display: none;">
     <div class="lounge-sidebar">
+        <!-- 👥 UPDATED PROFILE SECTION WITH STYLISH LOGOUT ACTION CONTEXT -->
         <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
             <input type="file" id="userProfilePicUploader" accept="image/*" style="display: none;" onchange="executeOwnProfilePicUpload(this)">
             <div id="currentUserAvatarWrapper" onclick="document.getElementById('userProfilePicUploader').click();" style="cursor: pointer; position: relative;" title="Click to upload profile picture">
                 <div class="sidebar-dp-avatar" id="myProfileAvatarElement" style="width:70px; height:70px; font-size:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">👤</div>
             </div>
-            <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: white; margin: 0;">Username</h3>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
+                <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; width: fit-content; transition: background 0.2s;" onmouseover="this.style.background='#fb9fa3'" onmouseout="this.style.background='#ffc8b0'">🚪 Logout</button>
+            </div>
         </div>
 
         <hr style="border-color: #ad3b72; margin: 15px 0;">
@@ -603,6 +607,18 @@
     let isSignUpMode = false;
     let activeChatTarget = null; // Globally records who you are currently looking at
     let currentLoadedMessageCount = 0; // Tracks message depth state to completely prevent layout flickering
+
+    // 🔍 PERSISTENT AUTO-LOGIN INITIALIZATION OVERLOAD
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedSessionUser = localStorage.getItem('dipsum_logged_user');
+        if (savedSessionUser && savedSessionUser.trim() !== "") {
+            console.log("Active persistent session restoration: " + savedSessionUser);
+            document.getElementById('loginCard').style.display = 'none';
+            document.getElementById('chatLounge').style.display = 'flex';
+            document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
+            startAppSynchronization();
+        }
+    });
 
     function toggleAuthMode() {
         isSignUpMode = !isSignUpMode;
@@ -654,6 +670,9 @@
                         displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
                         toggleAuthMode();
                     } else {
+                        // 💾 COMMIT VALID USER SESSION TO RUNTIME DISK STORAGE
+                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
+
                         document.getElementById('loginCard').style.display = 'none';
                         document.getElementById('chatLounge').style.display = 'flex';
                         document.getElementById('currentProfileName').innerText = username.toLowerCase();
@@ -667,6 +686,17 @@
                 authBtn.innerText = initialBtnText;
                 displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
             });
+    }
+
+    // 🧼 SYSTEM APPMEMORY LOGOUT HANDLER ENGINE
+    function executeAppLogout() {
+        localStorage.removeItem('dipsum_logged_user');
+        if (refreshLoop) {
+            clearInterval(refreshLoop);
+        }
+        activeChatTarget = null;
+        currentLoadedMessageCount = 0;
+        window.location.reload();
     }
 
     function startAppSynchronization() {
