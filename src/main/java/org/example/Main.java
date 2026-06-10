@@ -8,41 +8,68 @@ import java.util.concurrent.ConcurrentHashMap;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 
+// 🔔 NEW IMPORTS FOR WEB PUSH
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import nl.martijndwars.webpush.Notification;
+import nl.martijndwars.webpush.PushService;
+import nl.martijndwars.webpush.Subscription;
+import com.google.gson.Gson;
+import java.security.Security;
+import org.apache.http.HttpResponse;
+
 public class Main {
 
-    // 👤 Global Core Storage: Maps username -> Base64 Image Payload String (Backed by SQL)
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
-
-    // SQLite Connection String pointing to our local file database
-    private static final String DB_URL = "jdbc:sqlite:chatlounge.db";
+    
+    // 🔔 Stores the unique phone routing tokens for each user
+    public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
+    
+    private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
+    private static PushService pushService;
 
     public static void main(String[] args) {
-        // 1. Registered User Base
         HashMap<String, String> userDatabase = new HashMap<>();
-
-        // 2. Heartbeat Monitor: Track when users last pinged the server (Kept in RAM, resets naturally)
         HashMap<String, Long> userLastSeen = new HashMap<>();
-
-        // 3. Pending Incoming Invitations (Receiver -> Sender)
         HashMap<String, String> activeInvites = new HashMap<>();
-
-        // 4. Multi-Chat Map: Tracks who has open channels with whom ("user1:user2")
         HashSet<String> establishedConnections = new HashSet<>();
-
-        // 5. Unread Message Counter Map (Recipient#Sender -> Count)
         HashMap<String, Integer> unreadCounts = new HashMap<>();
-
-        // 6. Global Chat Repository (RoomKey -> List of encoded message tokens "sender:text")
         HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
 
-        // 💾 LOAD ALL DATA FROM DATABASE FILE ON STARTUP
+        // 🔔 Initialize Security Provider and Web Push Engine with your Keys
+        Security.addProvider(new BouncyCastleProvider());
+        try {
+            pushService = new PushService(
+                "mailto:cellflow24@gmail.com",
+                "BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI",
+                "a7WkNnBOk0meXEkN-R8doC0rKuk70omQvaEkt-OOiZs"
+            );
+        } catch (Exception e) {
+            System.err.println("Critical Error starting Push Service: " + e.getMessage());
+        }
+
         initializeDatabase(userDatabase, establishedConnections, chatHistories);
 
         Javalin app = Javalin.create(config -> {
-            config.staticFiles.add("/", Location.CLASSPATH);
+            config.staticFiles.add("/public", Location.CLASSPATH);
         });
 
-        // --- 🚪 API CHANNELS & SECURITY GATES ---
+        app.get("/", ctx -> ctx.redirect("/index.html"));
+
+        // --- API CHANNELS ---
+
+        // 🔔 NEW: Endpoint to catch and save the browser's push token
+        app.post("/api/saveSubscription", ctx -> {
+            String username = ctx.queryParam("username");
+            String subJson = ctx.body();
+            if (username != null && !subJson.isEmpty()) {
+                String cleanUser = username.trim().toLowerCase();
+                userSubscriptions.put(cleanUser, subJson);
+                saveSubscriptionToDatabase(cleanUser, subJson);
+                ctx.result("SUBSCRIPTION_SAVED");
+            } else {
+                ctx.status(400).result("FAIL");
+            }
+        });
 
         app.get("/api/login", ctx -> {
             String user = ctx.queryParam("username");
@@ -68,14 +95,11 @@ public class Main {
                 userDatabase.put(user, pass);
                 saveUserToDatabase(user, pass);
 
-                // 🤝 AUTO-CONNECT TO HELP CHANNEL IMMEDIATELY
                 if (user != null && !user.equals("help")) {
                     establishedConnections.add(user + ":help");
                     establishedConnections.add("help:" + user);
                     saveConnectionToDatabase(user, "help");
-                    System.out.println("--> [HELP CHANNEL AUTO-OPENED] " + user + " <--> help");
                 }
-
                 ctx.result("SUCCESS: Account created successfully!");
             }
         });
@@ -135,16 +159,12 @@ public class Main {
 
             String cleanUser = user.trim().toLowerCase();
             userProfilePics.put(cleanUser, imagePayload);
-
-            // 💾 PERSIST PROFILE IMAGE TO DISK
             saveProfilePicToDatabase(cleanUser, imagePayload);
-
             ctx.result("UPLOAD_SUCCESSFUL");
         });
 
         app.get("/api/sendInvite", ctx -> {
             String fromUser = ctx.queryParam("from");
-            String Henry = ctx.queryParam("to");
             String toUser = ctx.queryParam("to");
 
             if (fromUser == null || toUser == null) {
@@ -182,12 +202,31 @@ public class Main {
 
             chatHistories.putIfAbsent(roomKey, new ArrayList<>());
             chatHistories.get(roomKey).add(contentPayloadToken);
-
-            // 💾 PERSIST MESSAGE LOG TO DISK
             saveMessageToDatabase(roomKey, contentPayloadToken);
 
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
+
+            // 🔔 NEW: NATIVE OS WEB PUSH TRIGGER ENGINE
+            // If the recipient has a registered phone, wake it up!
+            String recipientSubJson = userSubscriptions.get(cleanTo);
+            if (recipientSubJson != null && pushService != null) {
+                try {
+                    Subscription sub = new Gson().fromJson(recipientSubJson, Subscription.class);
+                    
+                    // Format message snippet for the notification banner
+                    String snippet = messageBody.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Sent an image" : messageBody;
+                    if (snippet.length() > 40) snippet = snippet.substring(0, 40) + "...";
+                    
+                    String payload = String.format("{\"title\":\"New message from %s\", \"body\":\"%s\"}", capitalizeFirstLetter(cleanFrom), snippet);
+                    Notification notification = new Notification(sub, payload);
+                    
+                    // Fire it off to Google/Apple servers!
+                    HttpResponse response = pushService.send(notification);
+                } catch (Exception e) {
+                    System.err.println("Failed to dispatch push notification: " + e.getMessage());
+                }
+            }
 
             ctx.result("MESSAGE_DISPATCHED_SUCCESSFULLY");
         });
@@ -220,11 +259,7 @@ public class Main {
             if (action.equalsIgnoreCase("accept") && sender != null) {
                 establishedConnections.add(cleanUser + ":" + sender);
                 establishedConnections.add(sender + ":" + cleanUser);
-
-                // 💾 PERSIST NEW ACCEPTED CHAT LINK TO DISK
                 saveConnectionToDatabase(cleanUser, sender);
-
-                System.out.println("--> [CHANNEL OPENED] " + cleanUser + " <--> " + sender);
             }
             ctx.result("SUCCESS");
         });
@@ -259,105 +294,86 @@ public class Main {
             ctx.result(String.join("\n", messages));
         });
 
-        app.start(7070);
+        String port = System.getenv("PORT");
+        if (port != null) {
+            app.start(Integer.parseInt(port));
+        } else {
+            app.start(7070);
+        }
     }
 
-    // 🗄️ EXTENDED DATABASE CORE PIPELINE FUNCTIONS
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
-
-            // 1. Create Tables
             stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT, PRIMARY KEY (user1, user2));");
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
-
-            // Seed base support account
+            
+            // 🔔 NEW: Create table to permanently store device push tokens
+            stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT);");
+            
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
-
-            // 2. Hydrate Accounts Map
+            
             ResultSet rsUsers = stmt.executeQuery("SELECT username, password FROM users;");
-            while (rsUsers.next()) {
-                userDatabase.put(rsUsers.getString("username"), rsUsers.getString("password"));
-            }
-
-            // 3. Hydrate Verified Channel Links
+            while (rsUsers.next()) userDatabase.put(rsUsers.getString("username"), rsUsers.getString("password"));
+            
             ResultSet rsConn = stmt.executeQuery("SELECT user1, user2 FROM connections;");
             while (rsConn.next()) {
-                String u1 = rsConn.getString("user1");
-                String u2 = rsConn.getString("user2");
-                establishedConnections.add(u1 + ":" + u2);
-                establishedConnections.add(u2 + ":" + u1);
+                establishedConnections.add(rsConn.getString("user1") + ":" + rsConn.getString("user2"));
+                establishedConnections.add(rsConn.getString("user2") + ":" + rsConn.getString("user1"));
             }
-
-            // 4. Hydrate Chat Log History Repositories
+            
             ResultSet rsMsg = stmt.executeQuery("SELECT room_key, token FROM messages ORDER BY id ASC;");
             while (rsMsg.next()) {
-                String key = rsMsg.getString("room_key");
-                String token = rsMsg.getString("token");
-                chatHistories.putIfAbsent(key, new ArrayList<>());
-                chatHistories.get(key).add(token);
+                chatHistories.putIfAbsent(rsMsg.getString("room_key"), new ArrayList<>());
+                chatHistories.get(rsMsg.getString("room_key")).add(rsMsg.getString("token"));
             }
-
-            // 5. Hydrate Saved Custom Profile Icons
+            
             ResultSet rsPics = stmt.executeQuery("SELECT username, payload FROM profile_pics;");
-            while (rsPics.next()) {
-                userProfilePics.put(rsPics.getString("username"), rsPics.getString("payload"));
-            }
-
-            System.out.println("--> [DATABASE RESTORED] Loaded Users: " + userDatabase.size() + " | Channels: " + establishedConnections.size() / 2 + " | Pictures: " + userProfilePics.size());
-
-        } catch (SQLException e) {
-            System.err.println("Database initialization error: " + e.getMessage());
-        }
+            while (rsPics.next()) userProfilePics.put(rsPics.getString("username"), rsPics.getString("payload"));
+            
+            // 🔔 NEW: Load saved device subscriptions on server startup
+            ResultSet rsSub = stmt.executeQuery("SELECT username, sub_json FROM subscriptions;");
+            while (rsSub.next()) userSubscriptions.put(rsSub.getString("username"), rsSub.getString("sub_json"));
+            
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void saveUserToDatabase(String username, String password) {
-        String query = "INSERT OR REPLACE INTO users (username, password) VALUES (?, ?);";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Failed to write account profile row: " + e.getMessage());
-        }
+    private static void saveUserToDatabase(String u, String p) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO users VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void saveConnectionToDatabase(String user1, String user2) {
-        String query = "INSERT OR IGNORE INTO connections (user1, user2) VALUES (?, ?);";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setString(1, user1);
-            pstmt.setString(2, user2);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Failed to secure connection map coordinate: " + e.getMessage());
-        }
+    private static void saveConnectionToDatabase(String u1, String u2) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR IGNORE INTO connections VALUES (?, ?)")) {
+            ps.setString(1, u1); ps.setString(2, u2); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void saveMessageToDatabase(String roomKey, String token) {
-        String query = "INSERT INTO messages (room_key, token) VALUES (?, ?);";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setString(1, roomKey);
-            pstmt.setString(2, token);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Failed to archive chat message token record: " + e.getMessage());
-        }
+    private static void saveMessageToDatabase(String r, String t) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT INTO messages (room_key, token) VALUES (?, ?)")) {
+            ps.setString(1, r); ps.setString(2, t); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void saveProfilePicToDatabase(String username, String payload) {
-        String query = "INSERT OR REPLACE INTO profile_pics (username, payload) VALUES (?, ?);";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, payload);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Failed to backup avatar binary profile token: " + e.getMessage());
-        }
+    private static void saveProfilePicToDatabase(String u, String p) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO profile_pics VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+    
+    // 🔔 NEW: Helper function to save subscriptions permanently
+    private static void saveSubscriptionToDatabase(String u, String s) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO subscriptions VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, s); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+
+    // 🔔 NEW: Helper to capitalize names in the notification banner
+    private static String capitalizeFirstLetter(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 }
