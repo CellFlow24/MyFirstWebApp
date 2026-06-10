@@ -754,8 +754,15 @@
 
     function dismissCustomSystemAlert() {
         document.getElementById('systemAlertModal').style.display = 'none';
-    }
 
+        // If a broken auto-session caused the crash, force return to the login panel
+        if (document.getElementById('chatLounge').style.display !== 'flex') {
+            localStorage.removeItem('dipsum_logged_user');
+            document.getElementById('loginCard').style.display = 'block';
+            const authBtn = document.getElementById('authBtn');
+            if (authBtn) authBtn.innerText = "Access Account";
+        }
+    }
     function capitalizeFirstLetter(string) {
         if (!string) return "";
         return string.charAt(0).toUpperCase() + string.slice(1);
