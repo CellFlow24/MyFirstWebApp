@@ -111,7 +111,7 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        .chat-log-display { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; position: relative; }
+        .chat-log-display { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .chat-footer-input-bar { padding: 15px 20px; background-color: #fffdf5; border-top: 1px solid #aad052; display: flex; gap: 12px; }
 
         @keyframes slideInUp {
@@ -119,44 +119,12 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* MODERN MODERNIZED MESSAGE STATUS INDICATORS */
         .msg-bubble {
             max-width: 65%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4;
             word-wrap: break-word; text-align: left; animation: slideInUp 0.2s ease-out forwards;
-            position: relative; display: flex; flex-direction: column;
         }
         .msg-outgoing { background: linear-gradient(135deg, #aad052 0%, #c1df7e 100%); color: #334155; align-self: flex-end; border-bottom-right-radius: 2px; }
         .msg-incoming { background: linear-gradient(135deg, #fb9fa3 0%, #ffc8b0 100%); color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
-
-        .msg-meta-info {
-            display: flex; align-items: center; justify-content: flex-end; gap: 4px; 
-            font-size: 10px; color: rgba(51, 65, 85, 0.6); margin-top: 4px; align-self: flex-end;
-        }
-        .msg-incoming .msg-meta-info { color: rgba(0, 0, 0, 0.5); }
-        
-        .msg-status-tick { font-size: 11px; display: inline-block; font-weight: bold; }
-        .tick-sent { color: #64748b; }
-        .tick-delivered { color: #475569; }
-        .tick-seen { color: #0284c7; }
-
-        /* WHATSAPP STYLE TYPING ANIMATION BUBBLE */
-        .whatsapp-typing-bubble {
-            align-self: flex-start; background: linear-gradient(135deg, #fb9fa3 0%, #ffc8b0 100%);
-            padding: 12px 16px; border-radius: 12px; border-bottom-left-radius: 2px;
-            display: none; align-items: center; gap: 4px; animation: slideInUp 0.2s ease-out;
-            margin-bottom: 5px;
-        }
-        .typing-dot {
-            width: 7px; height: 7px; background-color: #334155; border-radius: 50%;
-            display: inline-block; animation: waveBounce 1.3s infinite ease-in-out;
-        }
-        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes waveBounce {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-6px); }
-        }
 
         #userListContainer { max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 4px; }
         #userListContainer::-webkit-scrollbar, .chat-log-display::-webkit-scrollbar { width: 6px; }
@@ -255,6 +223,7 @@
         <h4>Available Directory</h4>
         <div id="userListContainer"></div>
     </div>
+
     <div class="lounge-main">
         <div id="chatPlaceholder">
             <h2>Step into the Dipsum Lounge! 🧸</h2>
@@ -285,540 +254,641 @@
 </div>
 
 <script>
-    const backendBaseUrl = 'https://myfirstwebapp-production-8a71.up.railway.app';
-    let localSessionSocket = null;
-    let myIdentifiedUsername = "";
-    let activeChatRoomKey = null;
-    let activeChatTargetUser = null;
-    let registrationFlowIsLoginMode = true;
-    let localProfilePicturesCache = {};
-    let activeTypingTimeout = null;
+    // 🌐 ABSOLUTE BACKEND ROUTING: Forces frontend to look at your live Railway server
+    const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
+
+    // 🎵 DUAL NOTIFICATION SOUND ENGINE
+    let totalUnreadMessagesTracked = 0;
+    const backgroundChime = new Audio('tune1.mp3'); // 📥 For background unread badge increases
+    const activeChatChime = new Audio('tune2.mp3'); // 💬 For new messages sliding into the open chat
+
+    let refreshLoop = null;
+    let currentInviteSender = null;
+    let isSignUpMode = false;
+    let activeChatTarget = null; 
+    let currentLoadedMessageCount = 0; 
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedSessionUser = localStorage.getItem('dipsum_logged_user');
+        if (savedSessionUser && savedSessionUser.trim() !== "") {
+            document.getElementById('loginCard').style.display = 'none';
+            document.getElementById('chatLounge').style.display = 'flex';
+            document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
+            startAppSynchronization();
+            setupPushNotifications(savedSessionUser.toLowerCase());
+        }
+    });
 
     function toggleAuthMode() {
-        registrationFlowIsLoginMode = !registrationFlowIsLoginMode;
-        document.getElementById("authTitle").innerText = registrationFlowIsLoginMode ? "Your Secure Chat Portal" : "Register New Account";
-        document.getElementById("authBtn").innerText = registrationFlowIsLoginMode ? "Access Account" : "Sign Up Securely";
-        document.getElementById("toggleText").innerText = registrationFlowIsLoginMode ? "Need an account?" : "Already verified?";
-        document.getElementById("toggleLink").innerText = registrationFlowIsLoginMode ? "Create one here" : "Log in now";
-    }
+        isSignUpMode = !isSignUpMode;
+        const authTitle = document.getElementById('authTitle');
+        const authDescription = document.getElementById('authDescription');
+        const authBtn = document.getElementById('authBtn');
+        const toggleText = document.getElementById('toggleText');
+        const toggleLink = document.getElementById('toggleLink');
 
-    function triggerCustomSystemAlert(icon, title, message) {
-        document.getElementById("sysAlertIcon").innerText = icon;
-        document.getElementById("sysAlertTitle").innerText = title;
-        document.getElementById("sysAlertText").innerText = message;
-        document.getElementById("systemAlertModal").style.display = "flex";
-    }
-
-    function dismissCustomSystemAlert() {
-        document.getElementById("systemAlertModal").style.display = "none";
+        if (isSignUpMode) {
+            authTitle.innerText = "Create New Account";
+            authDescription.innerText = "Sign up below to register your enterprise account.";
+            authBtn.innerText = "Register & Join";
+            toggleText.innerText = "Already have an account?";
+            toggleLink.innerText = "Log In here";
+        } else {
+            authTitle.innerText = "Your Secure Chat Portal";
+            authDescription.innerText = "Sign in to access your dashboard lounge.";
+            authBtn.innerText = "Access Account";
+            toggleText.innerText = "Need an account?";
+            toggleLink.innerText = "Create one here";
+        }
     }
 
     function handleAuthSubmit() {
-        const u = document.getElementById("usernameInput").value.trim();
-        const p = document.getElementById("passwordInput").value.trim();
-        if(!u || !p) {
-            triggerCustomSystemAlert("❌", "Validation Failed", "Please populate both username and password parameters before execution.");
+        const username = document.getElementById('usernameInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        const authBtn = document.getElementById('authBtn');
+
+        if (!username || !password) {
+            displaySystemAlert("Missing Information", "Please fill out both the username and password fields to proceed.", "🚫");
             return;
         }
-        const apiPath = registrationFlowIsLoginMode ? "/api/login" : "/api/register";
-        fetch(`${backendBaseUrl}${apiPath}?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`)
+
+        const initialBtnText = authBtn.innerText;
+        authBtn.innerText = "Processing...";
+
+        let targetUrl = `${backendBaseUrl}/api/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        if (isSignUpMode) {
+            targetUrl = `${backendBaseUrl}/api/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        }
+
+        fetch(targetUrl)
             .then(res => res.text())
             .then(data => {
-                if(data === "SUCCESS") {
-                    myIdentifiedUsername = u;
-                    document.getElementById("currentProfileName").innerText = u;
-                    document.getElementById("loginCard").style.display = "none";
-                    document.getElementById("chatLounge").style.display = "flex";
-                    initializeLoungeSocketConnection();
-                    pullLatestDirectoryListing();
-                    fetchProfilePicture(u, imgData => {
-                        const avatarEl = document.getElementById("myProfileAvatarElement");
-                        if(avatarEl) {
-                            if(imgData) {
-                                avatarEl.innerHTML = `<img src="${imgData}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-                            } else {
-                                avatarEl.innerText = u.substring(0,2).toUpperCase();
-                            }
-                        }
-                    });
-                } else {
-                    triggerCustomSystemAlert("🔒", "Authentication Refused", data);
-                }
-            }).catch(() => triggerCustomSystemAlert("📡", "Network Error", "Unable to establish communication link with backend."));
-    }
-
-    function initializeLoungeSocketConnection() {
-        const socketTargetUrl = backendBaseUrl.replace("http", "ws") + "/ws?username=" + encodeURIComponent(myIdentifiedUsername);
-        localSessionSocket = new WebSocket(socketTargetUrl);
-
-        localSessionSocket.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-            
-            if(msg.type === "INVITE") {
-                activeChatRoomKey = msg.room;
-                activeChatTargetUser = msg.sender;
-                document.getElementById("modalTitle").innerText = "Incoming Connect Request";
-                document.getElementById("modalMessage").innerText = `${msg.sender} wishes to open an encrypted transmission corridor with you.`;
-                document.getElementById("inviteModal").classList.add("active");
-            }
-            else if(msg.type === "INVITE_ACCEPTED") {
-                activeChatRoomKey = msg.room;
-                setupChatWorkspaceWindow(activeChatTargetUser);
-                requestLiveChatHistory(activeChatRoomKey);
-                // Notify server we have loaded the chat pane and seen any existing texts
-                sendNotificationReadReceipt(activeChatRoomKey, activeChatTargetUser);
-            }
-            else if(msg.type === "INVITE_DECLINED") {
-                triggerCustomSystemAlert("⏳", "Request Cancelled", "The user has declined or closed your transmission handshake request.");
-                activeChatTargetUser = null;
-                activeChatRoomKey = null;
-            }
-            else if(msg.type === "TEXT" || msg.type === "MEDIA") {
-                if(activeChatRoomKey === msg.room) {
-                    appendMessageToDisplayLog(msg);
-                    // Automatically send seen update if text came from target user
-                    if (msg.sender === activeChatTargetUser) {
-                        sendNotificationReadReceipt(activeChatRoomKey, activeChatTargetUser);
-                    }
-                } else {
-                    pullLatestDirectoryListing();
-                }
-            }
-            else if(msg.type === "TYPING") {
-                if(activeChatRoomKey === msg.room && msg.sender === activeChatTargetUser) {
-                    toggleTypingIndicatorDisplay(msg.isTyping);
-                }
-            }
-            else if(msg.type === "STATUS_UPDATE") {
-                if(activeChatRoomKey === msg.room && msg.sender === activeChatTargetUser) {
-                    updateExistingMessageTicksInView(msg.status);
-                }
-            }
-            else if(msg.type === "DIRECTORY_REFRESH") {
-                pullLatestDirectoryListing();
-            }
-        };
-
-        localSessionSocket.onclose = () => {
-            console.log("Transmission link separated. Re-establishing link...");
-            setTimeout(initializeLoungeSocketConnection, 2000);
-        };
-    }
-
-    function pullLatestDirectoryListing() {
-        fetch(`${backendBaseUrl}/api/directory?me=${encodeURIComponent(myIdentifiedUsername)}`)
-            .then(res => res.json())
-            .then(users => {
-                const container = document.getElementById("userListContainer");
-                container.innerHTML = "";
-                users.forEach(u => {
-                    const item = document.createElement("div");
-                    item.style = "display:flex; align-items:center; justify-content:space-between; padding:12px; margin-bottom:8px; background:#fffdf5; border:1px solid #aad052; border-radius:10px; cursor:pointer; transition:transform 0.1s;";
-                    item.onclick = () => initiateChatCorridorHandshake(u.username);
-                    
-                    const leftSide = document.createElement("div");
-                    leftSide.style = "display:flex; align-items:center; gap:4px;";
-
-                    const avatar = document.createElement("div");
-                    avatar.className = "sidebar-dp-avatar";
-                    avatar.id = `sidebar_avatar_${u.username}`;
-                    avatar.innerText = u.username.substring(0,2).toUpperCase();
-                    leftSide.appendChild(avatar);
-
-                    fetchProfilePicture(u.username, imgData => {
-                        const av = document.getElementById(`sidebar_avatar_${u.username}`);
-                        if(av && imgData) av.innerHTML = `<img src="${imgData}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-                    });
-
-                    const nameSpan = document.createElement("span");
-                    nameSpan.innerText = u.username;
-                    nameSpan.style.fontWeight = "600";
-                    leftSide.appendChild(nameSpan);
-
-                    const dot = document.createElement("span");
-                    dot.className = "status-dot " + (u.online ? "status-online" : "status-offline");
-                    leftSide.appendChild(dot);
-
-                    item.appendChild(leftSide);
-
-                    if(u.unreadCount > 0) {
-                        const badge = document.createElement("span");
-                        badge.className = "unread-badge";
-                        badge.innerText = u.unreadCount;
-                        item.appendChild(badge);
-                    }
-
-                    container.appendChild(item);
-                });
-            });
-    }
-
-    function fetchProfilePicture(username, callback) {
-        if(localProfilePicturesCache[username]) {
-            callback(localProfilePicturesCache[username]);
-            return;
-        }
-        fetch(`${backendBaseUrl}/api/getProfilePic?username=${encodeURIComponent(username)}`)
-            .then(res => res.text())
-            .then(data => {
-                if(data && data.startsWith("data:image")) {
-                    localProfilePicturesCache[username] = data;
-                    callback(data);
-                } else {
-                    callback(null);
-                }
-            }).catch(() => callback(null));
-    }
-
-    function executeOwnProfilePicUpload(inputElement) {
-        if(!inputElement.files || !inputElement.files[0]) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const base64Src = e.target.result;
-            fetch(`${backendBaseUrl}/api/uploadProfilePic?username=${encodeURIComponent(myIdentifiedUsername)}`, {
-                method: 'POST',
-                body: base64Src
-            }).then(res => res.text())
-                .then(status => {
-                    if(status === "SUCCESS") {
-                        localProfilePicturesCache[myIdentifiedUsername] = base64Src;
-                        document.getElementById("myProfileAvatarElement").innerHTML = `<img src="${base64Src}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-                        if(localSessionSocket && localSessionSocket.readyState === WebSocket.OPEN) {
-                            localSessionSocket.send(JSON.stringify({ type: "DIRECTORY_REFRESH" }));
-                        }
-                    }
-                });
-        };
-        reader.readAsDataURL(inputElement.files[0]);
-    }
-
-    function initiateChatCorridorHandshake(targetUser) {
-        activeChatTargetUser = targetUser;
-        if(window.innerWidth <= 768) {
-            document.body.classList.add("mobile-chat-view-engaged");
-        }
-        setupChatWorkspaceWindow(targetUser);
-        localSessionSocket.send(JSON.stringify({
-            type: "INVITE",
-            sender: myIdentifiedUsername,
-            receiver: targetUser
-        }));
-    }
-
-    function submitInviteResponse(accepted) {
-        document.getElementById("inviteModal").classList.remove("active");
-        localSessionSocket.send(JSON.stringify({
-            type: accepted ? "INVITE_ACCEPTED" : "INVITE_DECLINED",
-            sender: myIdentifiedUsername,
-            receiver: activeChatTargetUser,
-            room: activeChatRoomKey
-        }));
-        if(accepted) {
-            setupChatWorkspaceWindow(activeChatTargetUser);
-            requestLiveChatHistory(activeChatRoomKey);
-            sendNotificationReadReceipt(activeChatRoomKey, activeChatTargetUser);
-        } else {
-            activeChatTargetUser = null;
-            activeChatRoomKey = null;
-        }
-    }
-
-    function setupChatWorkspaceWindow(targetUser) {
-        const mainArea = document.querySelector(".lounge-main");
-        mainArea.innerHTML = `
-            <div class="chat-window-pane">
-                <div class="chat-header-bar">
-                    <button onclick="leaveChatWorkspaceToDirectory()" class="tool-action-btn" style="margin-right:10px; display:none;" id="mobileBackBtn">⬅</button>
-                    <div class="header-dp-avatar" id="headerAvatarPane">👤</div>
-                    <div class="header-meta-box">
-                        <div class="status-round-container" id="headerRoundIndicator">
-                            <span class="status-dot status-offline" id="headerStatusDot"></span>
-                        </div>
-                        <span class="header-profile-title">${targetUser}</span>
-                    </div>
-                </div>
-                <div class="chat-log-display" id="chatDisplayContainer">
-                     <div class="whatsapp-typing-bubble" id="typingBubbleElement">
-                          <span class="typing-dot"></span>
-                          <span class="typing-dot"></span>
-                          <span class="typing-dot"></span>
-                     </div>
-                </div>
-                <div class="chat-footer-input-bar">
-                    <button class="tool-action-btn" onclick="toggleEmojiDrawerPanel()">😀</button>
-                    <input type="text" id="msgInputField" placeholder="Type encryption package context..." style="flex:1; padding:12px; border:1px solid #aad052; border-radius:8px;" onkeydown="evaluateInputFieldKeyPress(event)" oninput="handleTypingStateBroadcast()">
-                    <input type="file" id="mediaAttachmentUploader" style="display:none;" accept="image/*" onchange="executeMediaAttachmentPayloadUpload(this)">
-                    <button class="tool-action-btn" onclick="document.getElementById('mediaAttachmentUploader').click()">📎</button>
-                    <button class="sync-btn" id="mobileSendBtn" style="width:100px; padding:0;" onclick="dispatchTextMessage()">Send</button>
-                </div>
-                <div class="emoji-drawer-panel" id="emojiDrawer" style="display:none;">
-                    <span onclick="injectEmojiValue('❤️')">❤️</span>
-                    <span onclick="injectEmojiValue('🧸')">🧸</span>
-                    <span onclick="injectEmojiValue('✨')">✨</span>
-                    <span onclick="injectEmojiValue('🌸')">🌸</span>
-                    <span onclick="injectEmojiValue('🐱')">🐱</span>
-                </div>
-            </div>
-        `;
-
-        if(window.innerWidth <= 768) {
-            document.getElementById("mobileBackBtn").style.display = "flex";
-        }
-
-        fetchProfilePicture(targetUser, imgData => {
-            const hAv = document.getElementById("headerAvatarPane");
-            if(hAv) {
-                if(imgData) {
-                    hAv.innerHTML = `<img src="${imgData}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-                    document.getElementById("headerRoundIndicator").innerHTML = `<img src="${imgData}" class="status-round-indicator online" id="headerStatusDot">`;
-                } else {
-                    hAv.innerText = targetUser.substring(0,2).toUpperCase();
-                }
-            }
-        });
-        
-        fetch(`${backendBaseUrl}/api/directory?me=${encodeURIComponent(myIdentifiedUsername)}`)
-            .then(res => res.json())
-            .then(users => {
-                const currentTargetData = users.find(u => u.username === targetUser);
-                const dotElement = document.getElementById("headerStatusDot");
-                if(dotElement) {
-                    if(currentTargetData && currentTargetData.online) {
-                        dotElement.className = "status-round-indicator online";
+                authBtn.innerText = initialBtnText;
+                if (data.startsWith("SUCCESS")) {
+                    if (isSignUpMode) {
+                        displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
+                        toggleAuthMode();
                     } else {
-                        dotElement.className = "status-round-indicator";
-                        dotElement.style.boxShadow = "none";
-                        dotElement.style.animation = "none";
+                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
+                        document.getElementById('loginCard').style.display = 'none';
+                        document.getElementById('chatLounge').style.display = 'flex';
+                        document.getElementById('currentProfileName').innerText = username.toLowerCase();
+                        startAppSynchronization();
+                        setupPushNotifications(username.toLowerCase());
                     }
+                } else {
+                    displaySystemAlert("Authentication Failure", data, "❌");
                 }
+            })
+            .catch(err => {
+                authBtn.innerText = initialBtnText;
+                displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
             });
-    }
-
-    function leaveChatWorkspaceToDirectory() {
-        document.body.classList.remove("mobile-chat-view-engaged");
-        activeChatTargetUser = null;
-        activeChatRoomKey = null;
-        pullLatestDirectoryListing();
-    }
-
-    function toggleEmojiDrawerPanel() {
-        const drawer = document.getElementById("emojiDrawer");
-        drawer.style.display = (drawer.style.display === "none") ? "flex" : "none";
-    }
-
-    function injectEmojiValue(emoji) {
-        const input = document.getElementById("msgInputField");
-        input.value += emoji;
-        toggleEmojiDrawerPanel();
-        input.focus();
-        handleTypingStateBroadcast();
-    }
-
-    function requestLiveChatHistory(roomKey) {
-        localSessionSocket.send(JSON.stringify({
-            type: "HISTORY_REQUEST",
-            room: roomKey,
-            sender: myIdentifiedUsername
-        }));
-    }
-
-    function evaluateInputFieldKeyPress(event) {
-        if(event.key === "Enter") {
-            dispatchTextMessage();
-        }
-    }
-
-    // WHATSAPP STYLE TYPING STATE SYSTEM
-    function handleTypingStateBroadcast() {
-        if (!activeChatRoomKey) return;
-        
-        // Broadcast typing is true on key stroke entry loop
-        if (!activeTypingTimeout) {
-            localSessionSocket.send(JSON.stringify({
-                type: "TYPING",
-                room: activeChatRoomKey,
-                sender: myIdentifiedUsername,
-                receiver: activeChatTargetUser,
-                isTyping: true
-            }));
-        }
-
-        clearTimeout(activeTypingTimeout);
-        activeTypingTimeout = setTimeout(() => {
-            localSessionSocket.send(JSON.stringify({
-                type: "TYPING",
-                room: activeChatRoomKey,
-                sender: myIdentifiedUsername,
-                receiver: activeChatTargetUser,
-                isTyping: false
-            }));
-            activeTypingTimeout = null;
-        }, 1800);
-    }
-
-    function toggleTypingIndicatorDisplay(isTyping) {
-        const bubble = document.getElementById("typingBubbleElement");
-        const container = document.getElementById("chatDisplayContainer");
-        if (bubble) {
-            if (isTyping) {
-                bubble.style.display = "flex";
-                // Snap down dynamically to hold screen index priority
-                container.scrollTop = container.scrollHeight;
-            } else {
-                bubble.style.display = "none";
-            }
-        }
-    }
-
-    // DELIVERED & SEEN UPDATE ACTION RUNTIME
-    function sendNotificationReadReceipt(roomKey, senderOfTargetTexts) {
-        localSessionSocket.send(JSON.stringify({
-            type: "STATUS_UPDATE",
-            room: roomKey,
-            sender: myIdentifiedUsername, // I am confirming I read them
-            receiver: senderOfTargetTexts,
-            status: "SEEN"
-        }));
-    }
-
-    function updateExistingMessageTicksInView(statusState) {
-        const ticks = document.querySelectorAll(".msg-status-tick");
-        ticks.forEach(tick => {
-            if (statusState === "SEEN") {
-                tick.className = "msg-status-tick tick-seen";
-                tick.innerText = "✓✓";
-            } else if (statusState === "DELIVERED" && !tick.classList.contains("tick-seen")) {
-                tick.className = "msg-status-tick tick-delivered";
-                tick.innerText = "✓✓";
-            }
-        });
-    }
-
-    function dispatchTextMessage() {
-        const field = document.getElementById("msgInputField");
-        const textValue = field.value.trim();
-        if(!textValue || !activeChatRoomKey) return;
-
-        // Immediately notify server typing loop has finished on hit send
-        if (activeTypingTimeout) {
-            clearTimeout(activeTypingTimeout);
-            activeTypingTimeout = null;
-        }
-        localSessionSocket.send(JSON.stringify({
-            type: "TYPING",
-            room: activeChatRoomKey,
-            sender: myIdentifiedUsername,
-            receiver: activeChatTargetUser,
-            isTyping: false
-        }));
-
-        const messagePackage = {
-            type: "TEXT",
-            room: activeChatRoomKey,
-            sender: myIdentifiedUsername,
-            receiver: activeChatTargetUser,
-            text: textValue,
-            status: "SENT" // Default sent state tag configuration
-        };
-
-        localSessionSocket.send(JSON.stringify(messagePackage));
-        field.value = "";
-        field.focus();
-    }
-
-    function executeMediaAttachmentPayloadUpload(fileInput) {
-        if(!fileInput.files || !fileInput.files[0] || !activeChatRoomKey) return;
-        const targetFile = fileInput.files[0];
-        const fileReader = new FileReader();
-        fileReader.onload = function(e) {
-            const base64Payload = e.target.result;
-            const mediaPackage = {
-                type: "MEDIA",
-                room: activeChatRoomKey,
-                sender: myIdentifiedUsername,
-                receiver: activeChatTargetUser,
-                text: base64Payload,
-                status: "SENT"
-            };
-            localSessionSocket.send(JSON.stringify(mediaPackage));
-        };
-        fileReader.readAsDataURL(targetFile);
-    }
-
-    function appendMessageToDisplayLog(msgPayload) {
-        const logDisplay = document.getElementById("chatDisplayContainer");
-        const bubble = document.createElement("div");
-        const isMe = (msgPayload.sender === myIdentifiedUsername);
-
-        bubble.className = "msg-bubble " + (isMe ? "msg-outgoing" : "msg-incoming");
-
-        if(msgPayload.type === "TEXT") {
-            const txtNode = document.createElement("span");
-            txtNode.innerText = msgPayload.text;
-            bubble.appendChild(txtNode);
-        } else if(msgPayload.type === "MEDIA") {
-            const imgNode = document.createElement("img");
-            imgNode.src = msgPayload.text;
-            imgNode.className = "msg-bubble-media";
-            imgNode.onclick = () => window.open(msgPayload.text, '_blank');
-            bubble.appendChild(imgNode);
-        }
-
-        // Generate customized modern ticks data row meta wrapper
-        const metaRow = document.createElement("div");
-        metaRow.className = "msg-meta-info";
-        
-        const timestamp = document.createElement("span");
-        const dateObj = new Date();
-        timestamp.innerText = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        metaRow.appendChild(timestamp);
-
-        // Render checkmarks uniquely for outbound messaging nodes
-        if (isMe) {
-            const tickElement = document.createElement("span");
-            let statusClass = "tick-sent";
-            let tickMark = "✓";
-
-            if (msgPayload.status === "SEEN") {
-                statusClass = "tick-seen";
-                tickMark = "✓✓";
-            } else if (msgPayload.status === "DELIVERED") {
-                statusClass = "tick-delivered";
-                tickMark = "✓✓";
-            }
-
-            tickElement.className = `msg-status-tick ${statusClass}`;
-            tickElement.innerText = tickMark;
-            metaRow.appendChild(tickElement);
-        }
-
-        bubble.appendChild(metaRow);
-
-        // Insert message right above the live typing placeholder block
-        const typingIndicator = document.getElementById("typingBubbleElement");
-        logDisplay.insertBefore(bubble, typingIndicator);
-        logDisplay.scrollTop = logDisplay.scrollHeight;
     }
 
     function executeAppLogout() {
-        if(localSessionSocket) {
-            localSessionSocket.close();
+        localStorage.removeItem('dipsum_logged_user');
+        if (refreshLoop) clearInterval(refreshLoop);
+        activeChatTarget = null;
+        currentLoadedMessageCount = 0;
+        window.location.reload();
+    }
+
+    function startAppSynchronization() {
+        syncCycle();
+        refreshLoop = setInterval(syncCycle, 2000); 
+    }
+
+    function syncCycle() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
+            .then(res => res.text())
+            .then(rawText => {
+                const listContainer = document.getElementById('userListContainer');
+                if (!listContainer) return;
+                listContainer.innerHTML = "";
+                if(!rawText || rawText.trim() === "") return;
+
+                let currentCycleUnreadSum = 0; 
+
+                rawText.split('$$$').forEach(userToken => {
+                    if (!userToken || userToken.trim() === "") return;
+
+                    const parts = userToken.split('###');
+                    if (parts.length < 5) return;
+
+                    const targetUser = parts[0].trim();
+                    const isOnline = parts[1].trim() === "true";
+                    const unreadCount = parseInt(parts[2].trim(), 10);
+                    const relationshipStatus = parts[3].trim();
+                    let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
+                    const cleanName = targetUser.toLowerCase();
+
+                    if (cleanName !== activeChatTarget) {
+                        currentCycleUnreadSum += unreadCount;
+                    }
+
+                    if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
+                        customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
+                    }
+
+                    if(cleanName === user) {
+                        const myAvatarElement = document.getElementById('myProfileAvatarElement');
+                        if (myAvatarElement) {
+                            if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                                myAvatarElement.innerHTML = `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            } else {
+                                myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
+                            }
+                        }
+                        return;
+                    }
+
+                    if (cleanName === activeChatTarget) {
+                        updateHeaderUserStatusIndicator(isOnline);
+                    }
+
+                    const row = document.createElement('div');
+                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
+
+                    row.dataset.avatarData = customAvatarPic;
+                    row.onclick = () => openTargetChatWindow(cleanName);
+
+                    const statusClass = isOnline ? "status-online" : "status-offline";
+                    let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
+
+                    let dpContentHtml = "";
+                    if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                        dpContentHtml = `<img src="${customAvatarPic}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; display: block;">`;
+                    } else {
+                        dpContentHtml = `<div class="sidebar-dp-avatar" style="background:#334155; color:#94a3b8; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
+                    }
+
+                    let actionComponentHtml = "";
+                    if (relationshipStatus === "CONNECTED") {
+                        actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
+                    } else if (relationshipStatus === "PENDING") {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
+                    } else {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
+                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
+                    }
+
+                    row.innerHTML = `
+                        <div style="display: flex; align-items: center; position: relative;">
+                            <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                            ${dpContentHtml}
+                            <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                            ${unreadBadgeHtml}
+                        </div>
+                        ${actionComponentHtml}
+                    `;
+                    listContainer.appendChild(row);
+                });
+
+                if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
+                    backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
+                }
+                totalUnreadMessagesTracked = currentCycleUnreadSum;
+            });
+
+        if (activeChatTarget) {
+            fetchActiveChatMessages(user, activeChatTarget);
         }
-        myIdentifiedUsername = "";
-        activeChatRoomKey = null;
-        activeChatTargetUser = null;
-        document.getElementById("usernameInput").value = "";
-        document.getElementById("passwordInput").value = "";
-        document.getElementById("chatLounge").style.display = "none";
-        document.getElementById("loginCard").style.display = "block";
+
+        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`)
+            .then(res => res.text())
+            .then(response => {
+                const modal = document.getElementById('inviteModal');
+                if (response.startsWith("PENDING:")) {
+                    const sender = response.split(":")[1];
+                    if(!modal.classList.contains('active')) {
+                        currentInviteSender = sender;
+                        document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(sender)}</b> wants to start a live chat session with you.`;
+                        modal.classList.add('active');
+                    }
+                }
+            });
+    }
+
+    function sendChatInvite(targetUsername) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(user)}&to=${encodeURIComponent(targetUsername)}`)
+            .then(res => res.text())
+            .then(response => {
+                if (response.trim() === "SUCCESS") syncCycle();
+                else alert("Failed to send chat invitation. Please try again.");
+            })
+            .catch(err => console.error("Error dispatching invitation:", err));
+    }
+
+    function submitInviteResponse(isAccepted) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        const action = isAccepted ? "accept" : "decline";
+
+        document.getElementById('inviteModal').classList.remove('active');
+
+        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(user)}&action=${action}`)
+            .then(res => res.text())
+            .then(() => syncCycle());
+    }
+
+    function openTargetChatWindow(targetUsername) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        let activeUserRows = Array.from(document.getElementById('userListContainer').children);
+        let matchedRow = activeUserRows.find(row => row.innerHTML.toLowerCase().includes(targetUsername));
+        let activeChatAvatarPayload = (matchedRow && matchedRow.dataset.avatarData) ? matchedRow.dataset.avatarData : "NONE";
+
+        let isTargetOnline = false;
+        if (matchedRow) {
+            const statusDot = matchedRow.querySelector('.status-dot');
+            if (statusDot && statusDot.classList.contains('status-online')) isTargetOnline = true;
+        }
+
+        fetch(`${backendBaseUrl}/api/checkConnection?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUsername)}`)
+            .then(res => res.text())
+            .then(isAllowed => {
+                if (isAllowed.trim() === "TRUE") {
+
+                    currentLoadedMessageCount = 0;
+                    activeChatTarget = targetUsername;
+
+                    let loungeMain = document.querySelector('.lounge-main');
+                    if (!loungeMain) loungeMain = document.querySelector('div[style*="flex: 1"]') || document.querySelector('div[style*="flex:1"]');
+                    if (!loungeMain) return;
+
+                    let headerAvatarHtml = "";
+                    if(activeChatAvatarPayload !== "NONE" && activeChatAvatarPayload.trim() !== "" && !activeChatAvatarPayload.includes("broken")) {
+                        headerAvatarHtml = `<img src="${activeChatAvatarPayload}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:12px;">`;
+                    } else {
+                        headerAvatarHtml = `<div class="header-dp-avatar" style="margin-right:12px; background:#2563eb; color:white; font-weight:bold; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">${targetUsername.charAt(0).toUpperCase()}</div>`;
+                    }
+
+                    const initialStatusIconHtml = isTargetOnline
+                        ? `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`
+                        : `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+
+                    loungeMain.innerHTML = `
+                <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                    <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
+
+                        <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
+
+                        ${headerAvatarHtml}
+
+                        <div class="header-meta-box">
+                            <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px; line-height: 1.2;">${capitalizeFirstLetter(targetUsername)}</div>
+
+                            <div id="userStatusWrapper" class="status-round-container">
+                                ${initialStatusIconHtml}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background:#baa2a0;"></div>
+
+                    <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
+                        <span onclick="injectEmojiToken('😀')">😀</span>
+                        <span onclick="injectEmojiToken('👍')">👍</span>
+                        <span onclick="injectEmojiToken('❤️')">❤️</span>
+                        <span onclick="injectEmojiToken('🥰')">🥰</span>
+                        <span onclick="injectEmojiToken('🌹')">🌹</span>
+                        <span onclick="injectEmojiToken('💖')">💖</span>
+                        <span onclick="injectEmojiToken('😘')">😘</span>
+                    </div>
+
+                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
+
+                        <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
+
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
+
+                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
+
+                        <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
+
+                    </div>
+                </div>
+            `;
+
+                    if(window.innerWidth <= 768) {
+                        const backBtn = loungeMain.querySelector('.mobile-back-nav-btn');
+                        if(backBtn) backBtn.style.setProperty('display', 'block', 'important');
+                    }
+
+                    document.body.classList.add('mobile-chat-view-engaged');
+
+                    const activeChatLog = document.getElementById('chatLogDisplay');
+                    if (activeChatLog) {
+                        const keyboardResizeObserver = new ResizeObserver(() => {
+                            activeChatLog.scrollTop = activeChatLog.scrollHeight;
+                        });
+                        keyboardResizeObserver.observe(activeChatLog);
+                    }
+
+                    fetchActiveChatMessages(user, targetUsername);
+                } else {
+                    displaySystemAlert("Security Access Violation", `You do not have an active secure transmission channel.`, "🔒");
+                }
+            })
+            .catch(err => console.error("Error executing security header gateway sync:", err));
+    }   
+    
+    function fetchActiveChatMessages(currentUser, targetUser) {
+        fetch(`${backendBaseUrl}/api/getMessages?from=${encodeURIComponent(currentUser)}&to=${encodeURIComponent(targetUser)}`)
+            .then(res => res.text())
+            .then(data => {
+                const logBox = document.getElementById('chatLogDisplay');
+                if(!logBox) return;
+
+                if(!data || data.trim() === "") {
+                    logBox.innerHTML = "";
+                    currentLoadedMessageCount = 0;
+                    return;
+                }
+
+                const incomingMessageTokens = data.split('\n');
+
+                if (currentLoadedMessageCount === 0) {
+                    logBox.innerHTML = "";
+                } else if (incomingMessageTokens.length === currentLoadedMessageCount) {
+                    return;
+                }
+
+                const isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
+                const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
+                
+                let hasFreshIncomingMessage = false;
+
+                newPacketsToAppend.forEach(msgToken => {
+                    const separatorIndex = msgToken.indexOf(':');
+                    if (separatorIndex === -1) return;
+
+                    const sender = msgToken.substring(0, separatorIndex);
+                    let text = msgToken.substring(separatorIndex + 1);
+
+                    if (sender !== currentUser) hasFreshIncomingMessage = true;
+
+                    const bubble = document.createElement('div');
+                    bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
+
+                    if (text.startsWith("IMG_ATTACHMENT_DATA:")) {
+                        let rawBase64Source = text.replace("IMG_ATTACHMENT_DATA:", "");
+                        if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) {
+                            rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
+                        }
+                        bubble.innerHTML = `<img src="${rawBase64Source}" class="msg-bubble-media" onclick="window.open('${rawBase64Source}', '_blank')">`;
+                        bubble.style.background = "transparent";
+                        bubble.style.padding = "0";
+                    } else {
+                        bubble.innerText = text;
+                    }
+                    logBox.appendChild(bubble);
+                });
+
+                if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) {
+                    activeChatChime.play().catch(e => console.log("Audio autoplay prevented."));
+                }
+
+                currentLoadedMessageCount = incomingMessageTokens.length;
+
+                if (isScrolledToBottom || currentLoadedMessageCount === incomingMessageTokens.length) {
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            })
+            .catch(err => console.error("Error synchronizing active conversation state:", err));
+    }
+
+    function toggleEmojiDrawerOverlay() {
+        const drawer = document.getElementById('emojiMiniDrawer');
+        if(!drawer) return;
+        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
+    }
+
+    function injectEmojiToken(emojiChar) {
+        const inputField = document.getElementById('msgInputField');
+        if(inputField) {
+            inputField.value += emojiChar;
+            inputField.focus();
+        }
+        document.getElementById('emojiMiniDrawer').style.display = 'none';
+    }
+
+    function processMediaFileTransmission(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const targetsSelectedFile = fileInput.files[0];
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const maxW = 400; const maxH = 400;
+                let w = img.width; let h = img.height;
+
+                if (w > h) { if (w > maxW) { h *= maxW / w; w = maxW; } } 
+                else { if (h > maxH) { w *= maxH / h; h = maxH; } }
+
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+
+                const compressedBase64DataString = canvas.toDataURL('image/jpeg', 0.6);
+                const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+                const encodedPayloadString = "IMG_ATTACHMENT_DATA:" + compressedBase64DataString;
+
+                fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: encodedPayloadString
+                }).then(res => res.text()).then(() => {
+                        fileInput.value = "";
+                        fetchActiveChatMessages(user, activeChatTarget);
+                });
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(targetsSelectedFile);
+    }
+
+    function handleChatKeyDown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            triggerMessageDispatch();
+        }
+    }
+
+    function triggerMessageDispatch() {
+        const inputField = document.getElementById('msgInputField');
+        if(!inputField) return;
+
+        let messageContent = inputField.value.trim();
+        if(!messageContent || !activeChatTarget) return;
+
+        messageContent = messageContent.replace(/\n/g, "<br>");
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        inputField.value = "";
+        inputField.style.height = "45px";
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: messageContent
+        }).then(res => res.text()).then(() => {
+                fetchActiveChatMessages(user, activeChatTarget);
+        });
+    }
+
+    function displaySystemAlert(title, message, icon = "⚠️") {
+        document.getElementById('sysAlertIcon').innerText = icon;
+        document.getElementById('sysAlertTitle').innerText = title;
+        document.getElementById('sysAlertText').innerText = message;
+        document.getElementById('systemAlertModal').style.display = 'flex';
+    }
+
+    function dismissCustomSystemAlert() {
+        document.getElementById('systemAlertModal').style.display = 'none';
+
+        // If a broken auto-session caused the crash, force return to the login panel
+        if (document.getElementById('chatLounge').style.display !== 'flex') {
+            localStorage.removeItem('dipsum_logged_user');
+            document.getElementById('loginCard').style.display = 'block';
+            const authBtn = document.getElementById('authBtn');
+            if (authBtn) authBtn.innerText = "Access Account";
+        }
+    }
+    function capitalizeFirstLetter(string) {
+        if (!string) return "";
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    function executeOwnProfilePicUpload(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const targetFile = fileInput.files[0];
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const targetSize = 300;
+                canvas.width = targetSize; canvas.height = targetSize;
+
+                let srcX = 0; let srcY = 0;
+                let srcSize = Math.min(img.width, img.height);
+
+                if (img.width > img.height) srcX = (img.width - img.height) / 2;
+                else srcY = (img.height - img.width) / 2;
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, targetSize, targetSize);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.92);
+                const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+                fetch(`${backendBaseUrl}/api/uploadProfilePic?user=${encodeURIComponent(user)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: compressedBase64
+                }).then(res => res.text()).then(status => {
+                        if(status === "UPLOAD_SUCCESSFUL") {
+                            document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            syncCycle();
+                        }
+                });
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(targetFile);
+    }
+
+    function exitActiveMobileChatView() {
+        activeChatTarget = null;
+        currentLoadedMessageCount = 0;
+        document.body.classList.remove('mobile-chat-view-engaged');
+    }
+
+    function updateHeaderUserStatusIndicator(isOnline) {
+        const wrapper = document.getElementById('userStatusWrapper');
+        if (!wrapper) return;
+        if (isOnline) wrapper.innerHTML = `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`;
+        else wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+    }
+
+    // =========================================================================
+    // 🔔 NATIVE SYSTEM PUSH NOTIFICATION SUBSCRIPTION ENGINE
+    // =========================================================================
+
+    function setupPushNotifications(username) {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            console.log("Native Push Notifications are not supported by this browser client.");
+            return;
+        }
+
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('OS Notification layer permission cleared successfully!');
+                
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.pushManager.getSubscription().then(subscription => {
+                        if (subscription) {
+                            sendSubscriptionToServer(subscription, username);
+                            return subscription;
+                        }
+
+                        // 🚨 PASTE YOUR GENERATED PUBLIC KEY HERE:
+                        const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
+                        const convertedApplicationKey = urlBase64ToUint8Array(publicVapidKey);
+
+                        return registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: convertedApplicationKey
+                        }).then(newSubscription => {
+                            sendSubscriptionToServer(newSubscription, username);
+                        });
+                    }).catch(err => console.error("Could not register browser push properties:", err));
+                });
+            } else {
+                console.warn('System push notifications blocked by user device preferences.');
+            }
+        });
+    }
+
+    function sendSubscriptionToServer(subscription, username) {
+        fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+        }).then(res => res.text()).then(statusText => console.log("System Push Registration Sync status:", statusText))
+          .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
     }
 </script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('ServiceWorker tracking active initialization completed.', reg.scope))
-        .catch(err => console.error('ServiceWorker setup abandoned:', err));
+        .then(reg => console.log('Service Worker successfully registered!', reg))
+        .catch(err => console.error('Service worker registration failed:', err));
     });
   }
 </script>
