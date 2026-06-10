@@ -21,35 +21,26 @@
     </repositories>
 
     <dependencies>
-        <!-- Javalin web framework -->
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
             <version>5.6.3</version>
         </dependency>
-
-        <!-- SQLite database -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.45.2.0</version>
         </dependency>
-
-        <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.12</version>
         </dependency>
-
-        <!-- Web Push library -->
         <dependency>
             <groupId>nl.martijndwars</groupId>
             <artifactId>web-push</artifactId>
             <version>5.1.1</version>
         </dependency>
-
-        <!-- BouncyCastle - crypto for web-push (MUST match exactly) -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
@@ -60,15 +51,11 @@
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.70</version>
         </dependency>
-
-        <!-- JSON -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
         </dependency>
-
-        <!-- Apache HTTP Client - required by web-push to send to Google/Apple -->
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
@@ -79,8 +66,6 @@
             <artifactId>httpcore</artifactId>
             <version>4.4.16</version>
         </dependency>
-
-        <!-- jose4j - required by web-push for JWT signing -->
         <dependency>
             <groupId>org.bitbucket.b_c</groupId>
             <artifactId>jose4j</artifactId>
