@@ -34,13 +34,14 @@ public class Main {
 
         Security.addProvider(new BouncyCastleProvider());
         try {
-            pushService = new PushService(
-                "mailto:cellflow24@gmail.com",
-                "BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI",
-                "a7WkNnBOk0meXEkN-R8doC0rKuk70omQvaEkt-OOiZs"
-            );
+            pushService = new PushService();
+            pushService.setSubject("mailto:cellflow24@gmail.com");
+            pushService.setPublicKey("BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI");
+            pushService.setPrivateKey("a7WkNnBOk0meXEkN-R8doC0rKuk70omQvaEkt-OOiZs");
+            System.out.println("✅ Push Service initialized successfully");
         } catch (Exception e) {
             System.err.println("Critical Error starting Push Service: " + e.getMessage());
+            e.printStackTrace();
         }
 
         initializeDatabase(userDatabase, establishedConnections, chatHistories);
@@ -221,7 +222,13 @@ public class Main {
                             snippet.replace("\"", "'")
                         );
 
-                        Notification notification = new Notification(sub, payload);
+                        Notification notification = new Notification(
+                            sub.endpoint,
+                            sub.keys.p256dh,
+                            sub.keys.auth,
+                            payload.getBytes("UTF-8"),
+                            86400  // ✅ TTL = 24 hours - FCM will retry for 24hrs if phone is asleep
+                        );
                         HttpResponse response = pushService.send(notification);
                         int statusCode = response.getStatusLine().getStatusCode();
 
