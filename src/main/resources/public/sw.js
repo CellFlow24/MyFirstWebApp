@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('push', event => {
-  event.waitUntil((async () => {
+  const promise = (async () => {
     let title = 'Dipsum';
     let body = 'You have a new message';
     let url = '/';
@@ -48,17 +48,22 @@ self.addEventListener('push', event => {
       }
     }
 
-    return self.registration.showNotification(title, {
+    // Force show - this bypasses Chrome's quiet notification UI
+    await self.registration.showNotification(title, {
       body: body,
       icon: '/dipsum-logo.png',
       badge: '/dipsum-logo.png',
-      vibrate: [200, 100, 200, 100, 200],
+      vibrate: [300, 100, 300, 100, 300],
       requireInteraction: true,
-      tag: 'dipsum-message',
+      tag: 'dipsum-msg-' + Date.now(), // ✅ Unique tag = every message shows separately
       renotify: true,
+      silent: false,
       data: { url: url }
     });
-  })());
+  })();
+
+  // CRITICAL: Must pass the promise or Android kills the SW before notification shows
+  event.waitUntil(promise);
 });
 
 self.addEventListener('notificationclick', event => {
