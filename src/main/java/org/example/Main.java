@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 
-// 🔔 NEW IMPORTS FOR WEB PUSH
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
@@ -20,10 +19,8 @@ import org.apache.http.HttpResponse;
 public class Main {
 
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
-    
-    // 🔔 Stores the unique phone routing tokens for each user
     public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
-    
+
     private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
     private static PushService pushService;
 
@@ -35,7 +32,6 @@ public class Main {
         HashMap<String, Integer> unreadCounts = new HashMap<>();
         HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
 
-        // 🔔 Initialize Security Provider and Web Push Engine with your Keys
         Security.addProvider(new BouncyCastleProvider());
         try {
             pushService = new PushService(
@@ -55,9 +51,6 @@ public class Main {
 
         app.get("/", ctx -> ctx.redirect("/index.html"));
 
-        // --- API CHANNELS ---
-
-        // 🔔 NEW: Endpoint to catch and save the browser's push token
         app.post("/api/saveSubscription", ctx -> {
             String username = ctx.queryParam("username");
             String subJson = ctx.body();
@@ -207,25 +200,42 @@ public class Main {
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
 
-            // 🔔 NEW: NATIVE OS WEB PUSH TRIGGER ENGINE
-            // If the recipient has a registered phone, wake it up!
+            // ✅ FIXED: Send push in background thread - never blocks the request
             String recipientSubJson = userSubscriptions.get(cleanTo);
             if (recipientSubJson != null && pushService != null) {
-                try {
-                    Subscription sub = new Gson().fromJson(recipientSubJson, Subscription.class);
-                    
-                    // Format message snippet for the notification banner
-                    String snippet = messageBody.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Sent an image" : messageBody;
-                    if (snippet.length() > 40) snippet = snippet.substring(0, 40) + "...";
-                    
-                    String payload = String.format("{\"title\":\"New message from %s\", \"body\":\"%s\"}", capitalizeFirstLetter(cleanFrom), snippet);
-                    Notification notification = new Notification(sub, payload);
-                    
-                    // Fire it off to Google/Apple servers!
-                    HttpResponse response = pushService.send(notification);
-                } catch (Exception e) {
-                    System.err.println("Failed to dispatch push notification: " + e.getMessage());
-                }
+                final String subJsonFinal = recipientSubJson;
+                final String fromFinal = cleanFrom;
+                final String toFinal = cleanTo;
+                final String msgFinal = messageBody;
+
+                new Thread(() -> {
+                    try {
+                        Subscription sub = new Gson().fromJson(subJsonFinal, Subscription.class);
+
+                        String snippet = msgFinal.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Sent an image" : msgFinal;
+                        if (snippet.length() > 60) snippet = snippet.substring(0, 60) + "...";
+
+                        String payload = String.format(
+                            "{\"title\":\"💬 %s\", \"body\":\"%s\", \"url\":\"/\"}",
+                            capitalizeFirstLetter(fromFinal),
+                            snippet.replace("\"", "'")
+                        );
+
+                        Notification notification = new Notification(sub, payload);
+                        HttpResponse response = pushService.send(notification);
+                        int statusCode = response.getStatusLine().getStatusCode();
+
+                        // Clean up expired/invalid subscriptions
+                        if (statusCode == 410 || statusCode == 404) {
+                            userSubscriptions.remove(toFinal);
+                            deleteSubscriptionFromDatabase(toFinal);
+                            System.out.println("Cleaned expired subscription for: " + toFinal);
+                        }
+
+                    } catch (Exception e) {
+                        System.err.println("Push thread error for " + toFinal + ": " + e.getMessage());
+                    }
+                }).start();
             }
 
             ctx.result("MESSAGE_DISPATCHED_SUCCESSFULLY");
@@ -309,69 +319,78 @@ public class Main {
             stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT, PRIMARY KEY (user1, user2));");
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
-            
-            // 🔔 NEW: Create table to permanently store device push tokens
             stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT);");
-            
+
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
-            
+
             ResultSet rsUsers = stmt.executeQuery("SELECT username, password FROM users;");
             while (rsUsers.next()) userDatabase.put(rsUsers.getString("username"), rsUsers.getString("password"));
-            
+
             ResultSet rsConn = stmt.executeQuery("SELECT user1, user2 FROM connections;");
             while (rsConn.next()) {
                 establishedConnections.add(rsConn.getString("user1") + ":" + rsConn.getString("user2"));
                 establishedConnections.add(rsConn.getString("user2") + ":" + rsConn.getString("user1"));
             }
-            
+
             ResultSet rsMsg = stmt.executeQuery("SELECT room_key, token FROM messages ORDER BY id ASC;");
             while (rsMsg.next()) {
                 chatHistories.putIfAbsent(rsMsg.getString("room_key"), new ArrayList<>());
                 chatHistories.get(rsMsg.getString("room_key")).add(rsMsg.getString("token"));
             }
-            
+
             ResultSet rsPics = stmt.executeQuery("SELECT username, payload FROM profile_pics;");
             while (rsPics.next()) userProfilePics.put(rsPics.getString("username"), rsPics.getString("payload"));
-            
-            // 🔔 NEW: Load saved device subscriptions on server startup
+
             ResultSet rsSub = stmt.executeQuery("SELECT username, sub_json FROM subscriptions;");
             while (rsSub.next()) userSubscriptions.put(rsSub.getString("username"), rsSub.getString("sub_json"));
-            
+
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
     private static void saveUserToDatabase(String u, String p) {
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO users VALUES (?, ?)")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO users VALUES (?, ?)")) {
             ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
     private static void saveConnectionToDatabase(String u1, String u2) {
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR IGNORE INTO connections VALUES (?, ?)")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT OR IGNORE INTO connections VALUES (?, ?)")) {
             ps.setString(1, u1); ps.setString(2, u2); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
     private static void saveMessageToDatabase(String r, String t) {
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT INTO messages (room_key, token) VALUES (?, ?)")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO messages (room_key, token) VALUES (?, ?)")) {
             ps.setString(1, r); ps.setString(2, t); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
     private static void saveProfilePicToDatabase(String u, String p) {
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO profile_pics VALUES (?, ?)")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO profile_pics VALUES (?, ?)")) {
             ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
-    
-    // 🔔 NEW: Helper function to save subscriptions permanently
+
     private static void saveSubscriptionToDatabase(String u, String s) {
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO subscriptions VALUES (?, ?)")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO subscriptions VALUES (?, ?)")) {
             ps.setString(1, u); ps.setString(2, s); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    // 🔔 NEW: Helper to capitalize names in the notification banner
+    // ✅ NEW: Cleans up dead subscriptions automatically
+    private static void deleteSubscriptionFromDatabase(String u) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) {
+            ps.setString(1, u);
+            ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+
     private static String capitalizeFirstLetter(String str) {
         if (str == null || str.isEmpty()) return str;
         return str.substring(0, 1).toUpperCase() + str.substring(1);
