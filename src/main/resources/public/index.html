@@ -865,6 +865,35 @@ function subscribeAndSend(registration, username) {
         sendSubscriptionToServer(newSub, username);
     }).catch(err => console.error('Push subscribe failed:', err));
 }
+    // =========================================================================
+// 🔔 ADDED MISSING PUSH NOTIFICATION UTILITY FUNCTIONS
+// =========================================================================
+
+// Utility to convert your VAPID public key string into a Uint8Array format
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/\-/g, '+')
+        .replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// Function to safely dispatch active push subscriptions to your Javalin backend
+function sendSubscriptionToServer(subscription, username) {
+    fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+    })
+    .then(res => res.text())
+    .then(data => console.log("Subscription synced to backend:", data))
+    .catch(err => console.error("Error saving subscription:", err));
+}
     
 </script>
 <script>
