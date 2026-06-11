@@ -844,10 +844,12 @@
             navigator.serviceWorker.ready.then(registration => {
                 registration.pushManager.getSubscription().then(existingSub => {
                     if (existingSub) {
-                        // Already subscribed - just re-send token to server
-                        sendSubscriptionToServer(existingSub, username);
-                        return;
+                        // Unsubscribe the old one, then get a fresh one
+                        existingSub.unsubscribe().then(() => subscribeAndSend(registration, username));
+                    } else {
+                        subscribeAndSend(registration, username);
                     }
+                });
 
                     const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
 
@@ -884,6 +886,17 @@
         }
         return outputArray;
     }
+    
+    function subscribeAndSend(registration, username) {
+    const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
+    registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+    }).then(newSub => {
+        sendSubscriptionToServer(newSub, username);
+    }).catch(err => console.error('Push subscribe failed:', err));
+}
+    
 </script>
 <script>
   // Register SW immediately, not on load event
