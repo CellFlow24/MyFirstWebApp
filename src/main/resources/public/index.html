@@ -290,18 +290,41 @@
     });
 
     window.addEventListener('online', () => {
-        console.log("Device reconnected! New IP detected. Forcing rapid sync...");
+        console.log("Network signal detected! Waiting for interface to stabilize...");
         const savedSessionUser = localStorage.getItem('dipsum_logged_user');
         
         if (savedSessionUser && savedSessionUser.trim() !== "") {
-            // Restore visual cue
+            // Restore visual cue immediately
             document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
             
-            // Force an immediate fetch to bypass the 2-second timer delay
-            syncCycle(); 
+            // ⏳ MOBILE FIX: Wait 1.5 seconds before hitting the server. 
+            // This gives 4G/5G networks time to actually route the new IP address.
+            setTimeout(() => {
+                syncCycle(); 
+                setupPushNotifications(savedSessionUser.toLowerCase());
+            }, 1500); 
+        }
+    });
+    
+    // =========================================================================
+    // 📱 ADDED: MOBILE BACKGROUND/FOREGROUND RECOVERY
+    // =========================================================================
+    document.addEventListener('visibilitychange', () => {
+        // When the user brings the app back to the screen or unlocks their phone
+        if (document.visibilityState === 'visible') {
+            console.log("App awakened on mobile. Resetting network loops...");
+            const savedSessionUser = localStorage.getItem('dipsum_logged_user');
             
-            // CRITICAL: Refresh the Push Subscription against the new IP address
-            setupPushNotifications(savedSessionUser.toLowerCase());
+            if (savedSessionUser && savedSessionUser.trim() !== "") {
+                // 1. Destroy the old frozen interval loop
+                if (refreshLoop) clearInterval(refreshLoop);
+                
+                // 2. Force an immediate fetch to grab any messages missed while asleep
+                syncCycle();
+                
+                // 3. Start a brand new, clean interval loop
+                refreshLoop = setInterval(syncCycle, 2000);
+            }
         }
     });
     
