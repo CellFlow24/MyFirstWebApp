@@ -6,9 +6,19 @@ const ASSETS = [
   '/sw.js'
 ];
 
+// Force fetch directly from the network during installation
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      return Promise.all(
+        ASSETS.map(url => {
+          return fetch(new Request(url, { cache: 'reload' })).then(response => {
+            if (!response.ok) throw new Error(`Request failed for ${url}`);
+            return cache.put(url, response);
+          });
+        })
+      );
+    })
   );
   self.skipWaiting();
 });
