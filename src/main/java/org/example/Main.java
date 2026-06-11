@@ -111,7 +111,7 @@ public class Main {
                 }
 
                 long lastSeen = userLastSeen.getOrDefault(username, 0L);
-                boolean isOnline = (currentTime - lastSeen) < 7000;
+                boolean isOnline = (currentTime - lastSeen) < 15000;
 
                 String unreadKey = viewer + "#" + username;
                 int unreads = unreadCounts.getOrDefault(unreadKey, 0);
