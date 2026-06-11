@@ -1,95 +1,76 @@
-const CACHE_NAME = 'dipsum-v3'; 
+const CACHE_NAME = 'app-cache-v1';
 const ASSETS = [
+  '/',
   '/index.html',
-  '/dipsum-logo.png',
+  '/css/style.css', // Adjust these paths to match your actual frontend files
+  '/js/app.js',
   '/manifest.json'
 ];
 
-// Install Service Worker
+// 1. Install Event - Core assets are cached for offline availability
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
+      console.log('[Service Worker] Pre-caching core assets');
       return cache.addAll(ASSETS);
     })
   );
-  self.skipWaiting(); // Forces the new service worker to activate immediately
+  self.skipWaiting(); // Force the waiting service worker to become active immediately
 });
 
-// Activate and clean up old caches
+// 2. Activate Event - Clears out old caches if CACHE_NAME changes
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('[Service Worker] Clearing old cache:', cache);
+            return caches.delete(cache);
+          }
+        })
       );
     })
   );
-  self.clients.claim();
+  return self.clients.claim(); // Take control of all open pages immediately
 });
 
-// Fetch: Network-First Strategy with API Bypass
+// 3. Fetch Event - Network-First strategy with Cache Fallback
 self.addEventListener('fetch', event => {
-  // 🚨 Completely bypass the Service Worker for backend API calls
-  if (event.request.url.includes('/api/')) {
-    return; // Let the browser communicate natively with the Java backend
+  // 🚨 BYPASS FOR BACKEND API: Do not intercept or cache any backend communication routes
+  if (event.request.url.includes('/api/') || event.request.url.includes('/login') || event.request.url.includes('/logout')) {
+    return; // Let the browser handle these requests natively over the live network
   }
 
-  // Only intercept basic web page assets
+  // Only handle standard asset GET requests (HTML, CSS, JS, Images)
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
+    // Always attempt a fresh network request first
     fetch(event.request)
-      .catch(() => {
-        // If the network fails (offline), fall back to the cache
-        return caches.match(event.request);
-      })
-  );
-});
-
-// 🔔 NEW: Handle Native Web Push Notifications (Even when screen is locked/off)
-self.addEventListener('push', event => {
-  let data = { title: 'New Message', body: 'You received a new text context.' };
-
-  // Safely parse the payload sent from your backend server
-  if (event.data) {
-    try {
-      data = event.data.json();
-    } catch (e) {
-      data = { title: 'New Message', body: event.data.text() };
-    }
-  }
-
-  const options = {
-    body: data.body,
-    icon: '/dipsum-logo.png',   // App icon displayed on the side
-    badge: '/dipsum-logo.png',  // Tiny status bar icon for Android
-    vibrate: [200, 100, 200],    // Haptic vibration pattern when screen is locked
-    data: {
-      url: '/'                  // Deep-link context data mapping
-    }
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-// 🚀 NEW: Handle Tapping the Notification banner on the phone
-self.addEventListener('notificationclick', event => {
-  event.notification.close(); // Instantly dim and remove the banner from tray
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // If the app tab is already running background-frozen, bring it back forward
-      for (const client of clientList) {
-        if (client.url.includes('/') && 'focus' in client) {
-          return client.focus();
+      .then(response => {
+        // If the response is valid, dynamically update our cache with the latest version
+        if (response && response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
+          });
         }
-      }
-      // If the browser tab was completely swiped away, launch a fresh instance
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
-    })
+        return response;
+      })
+      .catch(() => {
+        // FALLBACK: If the network is completely unreachable (offline), load from cache
+        console.log('[Service Worker] Network failed, serving from cache:', event.request.url);
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          
+          // If the specific file isn't in cache, fallback to index.html for SPA routing
+          if (event.request.headers.get('accept').includes('text/html')) {
+            return caches.match('/index.html');
+          }
+        });
+      })
   );
 });
