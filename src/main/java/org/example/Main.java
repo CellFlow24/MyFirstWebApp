@@ -311,13 +311,13 @@ public class Main {
             ctx.result(String.join("\n", messages));
         });
 
+        // TO THIS:
         String port = System.getenv("PORT");
-        if (port != null) {
-            app.start(Integer.parseInt(port));
-        } else {
-            app.start(7070);
-        }
-    }
+        int portNumber = (port != null) ? Integer.parseInt(port) : 7070;
+
+        // Binding to "0.0.0.0" ensures the app is accessible on all interfaces
+        app.start("0.0.0.0", portNumber);
+        System.out.println("✅ Server started and listening on all interfaces at port " + portNumber);
 
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
