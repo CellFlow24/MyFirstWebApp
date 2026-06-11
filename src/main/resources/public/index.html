@@ -421,7 +421,7 @@
         isSyncingDirectory = true;
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // Give 4G/5G 15 seconds to connect
 
         fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`, { signal: controller.signal })
             .then(res => res.text())
@@ -545,7 +545,7 @@
         isSyncingInvites = true;
         
         const inviteController = new AbortController();
-        const inviteTimeoutId = setTimeout(() => inviteController.abort(), 5000);
+        const inviteTimeoutId = setTimeout(() => inviteController.abort(), 15000); // 15 seconds
 
         fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`, { signal: inviteController.signal })
             .then(res => res.text())
