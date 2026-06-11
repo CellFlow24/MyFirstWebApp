@@ -829,40 +829,42 @@
     // =========================================================================
 
     function setupPushNotifications(username) {
-        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-            console.log("Native Push Notifications are not supported by this browser client.");
+        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.log("Push not supported on this browser.");
             return;
         }
 
         Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                console.log('OS Notification layer permission cleared successfully!');
-                
-                navigator.serviceWorker.ready.then(registration => {
-                    registration.pushManager.getSubscription().then(subscription => {
-                        if (subscription) {
-                            sendSubscriptionToServer(subscription, username);
-                            return subscription;
-                        }
-
-                        // 🚨 PASTE YOUR GENERATED PUBLIC KEY HERE:
-                        const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
-                        const convertedApplicationKey = urlBase64ToUint8Array(publicVapidKey);
-
-                        return registration.pushManager.subscribe({
-                            userVisibleOnly: true,
-                            applicationServerKey: convertedApplicationKey
-                        }).then(newSubscription => {
-                            sendSubscriptionToServer(newSubscription, username);
-                        });
-                    }).catch(err => console.error("Could not register browser push properties:", err));
-                });
-            } else {
-                console.warn('System push notifications blocked by user device preferences.');
+            if (permission !== 'granted') {
+                console.warn('Notification permission denied.');
+                return;
             }
+
+            // Wait for SW to be fully ready before subscribing
+            navigator.serviceWorker.ready.then(registration => {
+                registration.pushManager.getSubscription().then(existingSub => {
+                    if (existingSub) {
+                        // Already subscribed - just re-send token to server
+                        sendSubscriptionToServer(existingSub, username);
+                        return;
+                    }
+
+                    const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
+
+                    registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                    }).then(newSub => {
+                        console.log('Push subscription created!');
+                        sendSubscriptionToServer(newSub, username);
+                    }).catch(err => {
+                        console.error('Push subscribe failed:', err);
+                    });
+                }).catch(err => console.error("Push setup error:", err));
+            });
         });
     }
-
+    
     function sendSubscriptionToServer(subscription, username) {
         fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
             method: 'POST',
@@ -884,12 +886,11 @@
     }
 </script>
 <script>
+  // Register SW immediately, not on load event
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('Service Worker successfully registered!', reg))
-        .catch(err => console.error('Service worker registration failed:', err));
-    });
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.error('SW failed:', err));
   }
 </script>
 </body>
