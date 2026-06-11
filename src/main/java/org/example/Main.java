@@ -1,324 +1,390 @@
-package com.chat;
-
-import io.javalin.Javalin;
-import io.javalin.http.staticfiles.Location;
-import org.eclipse.jetty.websocket.api.Session;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+package org.example;
 
 import java.sql.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import io.javalin.Javalin;
+import io.javalin.http.staticfiles.Location;
+
+// 🔔 IMPORTS FOR WEB PUSH
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import nl.martijndwars.webpush.Notification;
+import nl.martijndwars.webpush.PushService;
+import nl.martijndwars.webpush.Subscription;
+import com.google.gson.Gson;
+import java.security.Security;
+import org.apache.http.HttpResponse;
 
 public class Main {
 
-    private static final String DB_URL = "jdbc:sqlite:chat_app.db";
-    private static final Gson gson = new Gson();
-
-    // Core Active Memory Repositories
-    private static final Map<String, Session> wsConnections = new ConcurrentHashMap<>();
-    private static final Map<Session, String> inverseConnections = new ConcurrentHashMap<>();
-    private static final Set<String> establishedConnections = ConcurrentHashMap.newKeySet();
-    private static final Map<String, String> activeInvites = new ConcurrentHashMap<>();
-    private static final Map<String, List<String>> chatHistories = new ConcurrentHashMap<>();
-    private static final Map<String, Integer> unreadCounts = new ConcurrentHashMap<>();
-    private static final Map<String, Long> userLastSeen = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
+    
+    // 🔔 Stores the unique phone routing tokens for each user
+    public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
+    
+    private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
+    private static PushService pushService;
 
     public static void main(String[] args) {
-        initializeDatabase();
+        HashMap<String, String> userDatabase = new HashMap<>();
+        HashMap<String, Long> userLastSeen = new HashMap<>();
+        HashMap<String, String> activeInvites = new HashMap<>();
+        HashSet<String> establishedConnections = new HashSet<>();
+        HashMap<String, Integer> unreadCounts = new HashMap<>();
+        HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
+
+        // 🔔 Initialize Security Provider and Web Push Engine with your Keys
+        Security.addProvider(new BouncyCastleProvider());
+        try {
+            pushService = new PushService(
+                "BFlvSgA-vI6tX7U-tG9uY8zK5mN_6pQ4rS3tV2uW1xY_z_VAPID_PUBLIC_KEY_HERE",
+                "v_VAPID_PRIVATE_KEY_HERE",
+                "mailto:admin@dipsum.chat"
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to initialize Web Push Engine: " + e.getMessage());
+        }
+
+        initializeDatabase(userDatabase, establishedConnections, chatHistories);
 
         Javalin app = Javalin.create(config -> {
             config.staticFiles.add("/public", Location.CLASSPATH);
-        }).start(7070);
+        });
 
-        // Standard HTTP API REST Endpoints
-        app.post("/api/login", ctx -> {
-            JsonObject body = JsonParser.parseString(ctx.body()).getAsJsonObject();
-            String username = body.get("username").getAsString().trim().toLowerCase();
-            
-            if (username.isEmpty()) {
-                ctx.status(400).result("Username cannot be empty");
+        // Redirects root to your dashboard
+        app.get("/", ctx -> ctx.redirect("/index.html"));
+
+        // --- API CHANNELS ---
+
+        app.get("/api/login", ctx -> {
+            String u = ctx.queryParam("user");
+            String p = ctx.queryParam("pass");
+            if (u == null || p == null) {
+                ctx.result("fail");
                 return;
             }
-            
-            userLastSeen.put(username, System.currentTimeMillis());
-            JsonObject response = new JsonObject();
-            response.addProperty("status", "SUCCESS");
-            response.addProperty("username", username);
-            ctx.json(gson.toJson(response));
-        });
-
-        app.get("/api/online-status", ctx -> {
-            String targetUser = ctx.queryParam("user");
-            JsonObject response = new JsonObject();
-            if (targetUser != null) {
-                long currentTime = System.currentTimeMillis();
-                long lastSeen = userLastSeen.getOrDefault(targetUser.toLowerCase(), 0L);
-                boolean isOnline = (currentTime - lastSeen) < 7000; 
-                response.addProperty("username", targetUser);
-                response.addProperty("status", isOnline ? "ONLINE" : "OFFLINE");
+            u = u.trim().toLowerCase();
+            if (userDatabase.containsKey(u) && userDatabase.get(u).equals(p)) {
+                userLastSeen.put(u, System.currentTimeMillis());
+                ctx.result("success");
             } else {
-                response.addProperty("error", "Missing user parameter");
+                ctx.result("fail");
             }
-            ctx.json(gson.toJson(response));
         });
 
-        // --- WebSocket Pipeline Engine ---
+        app.get("/api/register", ctx -> {
+            String u = ctx.queryParam("user");
+            String p = ctx.queryParam("pass");
+            if (u == null || p == null || u.trim().isEmpty() || p.trim().isEmpty()) {
+                ctx.result("fail");
+                return;
+            }
+            u = u.trim().toLowerCase();
+            if (userDatabase.containsKey(u)) {
+                ctx.result("exists");
+            } else {
+                userDatabase.put(u, p);
+                saveUserToDatabase(u, p);
+                userLastSeen.put(u, System.currentTimeMillis());
+                ctx.result("success");
+            }
+        });
+
+        app.get("/api/online", ctx -> {
+            String u = ctx.queryParam("user");
+            if (u == null) { ctx.result("offline"); return; }
+            u = u.trim().toLowerCase();
+            long now = System.currentTimeMillis();
+            long last = userLastSeen.getOrDefault(u, 0L);
+            if (now - last < 7000) {
+                ctx.result("online");
+            } else {
+                ctx.result("offline");
+            }
+        });
+
+        app.get("/api/profile-pic", ctx -> {
+            String u = ctx.queryParam("user");
+            if (u == null) { ctx.result(""); return; }
+            ctx.result(userProfilePics.getOrDefault(u.trim().toLowerCase(), ""));
+        });
+
+        app.post("/api/profile-pic", ctx -> {
+            String u = ctx.queryParam("user");
+            String base64 = ctx.body();
+            if (u != null && base64 != null) {
+                u = u.trim().toLowerCase();
+                userProfilePics.put(u, base64);
+                saveProfilePicToDatabase(u, base64);
+                ctx.result("saved");
+            } else {
+                ctx.result("fail");
+            }
+        });
+
+        // 🔔 NEW: Receive and store browser PWA subscription contexts
+        app.post("/api/saveSubscription", ctx -> {
+            String username = ctx.queryParam("username");
+            String subscriptionJson = ctx.body();
+            if (username != null && subscriptionJson != null && !subscriptionJson.trim().isEmpty()) {
+                username = username.trim().toLowerCase();
+                userSubscriptions.put(username, subscriptionJson);
+                saveSubscriptionToDatabase(username, subscriptionJson);
+                ctx.result("Subscription paired on server.");
+            } else {
+                ctx.status(400).result("Invalid subscription request assets.");
+            }
+        });
+
+        // --- WEB SOCKET ROUTING PIPELINE ---
+
         app.ws("/ws", ws -> {
-            
+            ConcurrentHashMap<String, io.javalin.websocket.WsConnectContext> activeSockets = new ConcurrentHashMap<>();
+            ConcurrentHashMap<io.javalin.websocket.WsContext, String> socketOwners = new ConcurrentHashMap<>();
+
             ws.onConnect(ctx -> {
                 // Connection initiated
-                System.out.println("[WebSocket] Transient socket pipe established: " + ctx.session.getRemoteAddress());
             });
 
             ws.onClose(ctx -> {
-                String username = inverseConnections.remove(ctx.session);
-                if (username != null) {
-                    wsConnections.remove(username);
-                    System.out.println("[WebSocket] Session closed for user: " + username);
-                }
-            });
-
-            ws.onError(ctx -> {
-                String username = inverseConnections.get(ctx.session);
-                System.err.println("[WebSocket] Pipe error encountered for target: " + (username != null ? username : "Unknown"));
+                String u = socketOwners.remove(ctx);
+                if (u != null) activeSockets.remove(u);
             });
 
             ws.onMessage(ctx -> {
-                String messageStr = ctx.message();
-                JsonObject json = JsonParser.parseString(messageStr).getAsJsonObject();
+                String text = ctx.message();
+                com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(text).getAsJsonObject();
                 String type = json.get("type").getAsString();
 
-                // 1. Identify Connection Handshake Registration Event
                 if ("REGISTER".equals(type)) {
-                    String username = json.get("username").getAsString().trim().toLowerCase();
-                    wsConnections.put(username, ctx.session);
-                    inverseConnections.put(ctx.session, username);
-                    userLastSeen.put(username, System.currentTimeMillis());
-                    System.out.println("[WebSocket] User registered stream: " + username);
-                    return;
-                }
-
-                // Heartbeat to sustain long poll threads
-                if ("HEARTBEAT".equals(type)) {
-                    String username = json.get("username").getAsString().trim().toLowerCase();
-                    userLastSeen.put(username, System.currentTimeMillis());
-                    return;
-                }
-
-                // 2. Client Invitation Sequence
-                if ("INVITE".equals(type)) {
-                    String sender = json.get("sender").getAsString().trim().toLowerCase();
-                    String receiver = json.get("receiver").getAsString().trim().toLowerCase();
-                    String roomKey = generateRoomKey(sender, receiver);
-
-                    activeInvites.put(roomKey, sender);
+                    String u = json.get("username").getAsString().trim().toLowerCase();
+                    activeSockets.put(u, ctx);
+                    socketOwners.put(ctx, u);
+                    userLastSeen.put(u, System.currentTimeMillis());
                     
-                    Session receiverSession = wsConnections.get(receiver);
-                    if (receiverSession != null && receiverSession.isOpen()) {
-                        JsonObject invitePkg = new JsonObject();
-                        invitePkg.addProperty("type", "INVITE");
-                        invitePkg.addProperty("sender", sender);
-                        invitePkg.addProperty("room", roomKey);
-                        receiverSession.getRemote().sendString(gson.toJson(invitePkg));
+                    int totalUnread = 0;
+                    for (String key : unreadCounts.keySet()) {
+                        if (key.startsWith(u + "_")) {
+                            totalUnread += unreadCounts.get(key);
+                        }
+                    }
+                    com.google.gson.JsonObject resp = new com.google.gson.JsonObject();
+                    resp.addProperty("type", "UNREAD_TOTAL");
+                    resp.addProperty("count", totalUnread);
+                    ctx.send(resp.toString());
+                    return;
+                }
+
+                if ("HEARTBEAT".equals(type)) {
+                    String u = json.get("username").getAsString().trim().toLowerCase();
+                    userLastSeen.put(u, System.currentTimeMillis());
+                    return;
+                }
+
+                if ("INVITE".equals(type)) {
+                    String s = json.get("sender").getAsString().trim().toLowerCase();
+                    String r = json.get("receiver").getAsString().trim().toLowerCase();
+                    String room = json.get("room").getAsString();
+                    activeInvites.put(room, s);
+
+                    if (activeSockets.containsKey(r)) {
+                        activeSockets.get(r).send(text);
                     }
                 } 
                 
-                // 3. Invitation Acceptance Phase
                 else if ("INVITE_ACCEPTED".equals(type)) {
-                    String sender = json.get("sender").getAsString().trim().toLowerCase(); // Person who accepts
-                    String receiver = json.get("receiver").getAsString().trim().toLowerCase(); // Original inviter
-                    String roomKey = json.get("room").getAsString();
+                    String s = json.get("sender").getAsString().trim().toLowerCase();
+                    String r = json.get("receiver").getAsString().trim().toLowerCase();
+                    String room = json.get("room").getAsString();
 
-                    saveConnectionToDatabase(sender, receiver);
-                    establishedConnections.add(roomKey);
+                    saveConnectionToDatabase(s, r);
+                    establishedConnections.add(room);
 
-                    JsonObject acceptNotice = new JsonObject();
-                    acceptNotice.addProperty("type", "INVITE_ACCEPTED");
-                    acceptNotice.addProperty("room", roomKey);
-
-                    Session s1 = wsConnections.get(sender);
-                    Session s2 = wsConnections.get(receiver);
-                    if (s1 != null && s1.isOpen()) s1.getRemote().sendString(gson.toJson(acceptNotice));
-                    if (s2 != null && s2.isOpen()) s2.getRemote().sendString(gson.toJson(acceptNotice));
+                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
+                    if (activeSockets.containsKey(s)) activeSockets.get(s).send(text);
                 } 
-
-                // 4. Message Transmission Router (Text & Media Packets)
+                
                 else if ("TEXT".equals(type) || "MEDIA".equals(type)) {
                     String room = json.get("room").getAsString();
-                    String sender = json.get("sender").getAsString().trim().toLowerCase();
-                    String receiver = json.get("receiver").getAsString().trim().toLowerCase();
+                    String s = json.get("sender").getAsString().trim().toLowerCase();
+                    String r = json.get("receiver").getAsString().trim().toLowerCase();
 
-                    // 🔥 CRITICAL NETWORK-FAILSAFE BUGFIX:
-                    // Validate connection state against SQLite database if memory set is cleared during IP transitions
+                    // 🔥 WORKOUT FALLBACK CHECK: Look up existing connections table inside chatlounge.db
                     boolean isConnected = establishedConnections.contains(room);
                     if (!isConnected) {
-                        isConnected = checkConnectionInDatabase(sender, receiver);
-                        if (isConnected) {
-                            establishedConnections.add(room); // Instantly restore to active memory mapping cache
+                        try (Connection conn = DriverManager.getConnection(DB_URL);
+                             PreparedStatement ps = conn.prepareStatement(
+                                 "SELECT 1 FROM connections WHERE (user1=? AND user2=?) OR (user1=? AND user2=?)")) {
+                            ps.setString(1, s); ps.setString(2, r);
+                            ps.setString(3, r); ps.setString(4, s);
+                            try (ResultSet rs = ps.executeQuery()) {
+                                if (rs.next()) {
+                                    isConnected = true;
+                                    establishedConnections.add(room); // Restore to active RAM memory mapping cache
+                                }
+                            }
+                        } catch (SQLException ex) {
+                            System.err.println("Database sync check failed: " + ex.getMessage());
                         }
                     }
 
-                    // If neither memory cache nor SQLite database has verified this relation, intercept and trigger Handshake verification
                     if (!isConnected) {
-                        JsonObject alert = new JsonObject();
+                        com.google.gson.JsonObject alert = new com.google.gson.JsonObject();
                         alert.addProperty("type", "INVITE");
-                        alert.addProperty("sender", sender);
+                        alert.addProperty("sender", s);
                         alert.addProperty("room", room);
-                        
-                        Session receiverSession = wsConnections.get(receiver);
-                        if (receiverSession != null && receiverSession.isOpen()) {
-                            receiverSession.getRemote().sendString(gson.toJson(alert));
+                        if (activeSockets.containsKey(r)) {
+                            activeSockets.get(r).send(alert.toString());
                         }
-                        return; // Terminate execution block to halt unverified broadcast
+                        return; // Block execution to keep unverified routes silent
                     }
 
-                    // Process structural storage
-                    saveMessageToDatabase(room, messageStr);
-                    chatHistories.computeIfAbsent(room, k -> new CopyOnWriteArrayList<>()).add(messageStr);
+                    saveMessageToDatabase(room, text);
+                    if (!chatHistories.containsKey(room)) chatHistories.put(room, new ArrayList<>());
+                    chatHistories.get(room).add(text);
 
-                    Session s1 = wsConnections.get(sender);
-                    Session s2 = wsConnections.get(receiver);
-
-                    if (s2 != null && s2.isOpen()) {
+                    if (activeSockets.containsKey(r)) {
                         json.addProperty("status", "DELIVERED");
-                        s2.getRemote().sendString(gson.toJson(json));
+                        activeSockets.get(r).send(json.toString());
                         
-                        if (s1 != null && s1.isOpen()) {
-                            JsonObject delivNotice = new JsonObject();
-                            delivNotice.addProperty("type", "STATUS_UPDATE");
-                            delivNotice.addProperty("room", room);
-                            delivNotice.addProperty("sender", receiver);
-                            delivNotice.addProperty("status", "DELIVERED");
-                            s1.getRemote().sendString(gson.toJson(delivNotice));
+                        if (activeSockets.containsKey(s)) {
+                            com.google.gson.JsonObject upd = new com.google.gson.JsonObject();
+                            upd.addProperty("type", "STATUS_UPDATE");
+                            upd.addProperty("room", room);
+                            upd.addProperty("sender", r);
+                            upd.addProperty("status", "DELIVERED");
+                            activeSockets.get(s).send(upd.toString());
                         }
                     } else {
                         json.addProperty("status", "SENT");
-                        if (s1 != null && s1.isOpen()) {
-                            s1.getRemote().sendString(gson.toJson(json));
-                        }
+                        if (activeSockets.containsKey(s)) activeSockets.get(s).send(json.toString());
                         
-                        String unreadKey = receiver + "_" + sender;
-                        unreadCounts.put(unreadKey, unreadCounts.getOrDefault(unreadKey, 0) + 1);
-                        sendWebPushNotification(receiver, capitalizeFirstLetter(sender), "Sent you an encrypted package.");
+                        String k = r + "_" + s;
+                        unreadCounts.put(k, unreadCounts.getOrDefault(k, 0) + 1);
+
+                        // 🔔 TRIGGER NATIVE TELEPHONY WEB PUSH ENGINE
+                        String pushJson = userSubscriptions.get(r);
+                        if (pushJson != null) {
+                            try {
+                                Gson gson = new Gson();
+                                Subscription sub = gson.fromJson(pushJson, Subscription.class);
+                                
+                                com.google.gson.JsonObject pPayload = new com.google.gson.JsonObject();
+                                pPayload.addProperty("title", capitalizeFirstLetter(s));
+                                pPayload.addProperty("body", "TEXT".equals(type) ? json.get("text").getAsString() : "Sent a media file.");
+                                
+                                Notification notification = new Notification(sub, pPayload.toString());
+                                HttpResponse response = pushService.send(notification);
+                                System.out.println("Push status code: " + response.getStatusLine().getStatusCode());
+                            } catch (Exception e) {
+                                System.err.println("Failed sending push payload packet: " + e.getMessage());
+                            }
+                        }
                     }
-                }
+                } 
                 
-                // 5. Query Active Chat Threads History
                 else if ("HISTORY_REQUEST".equals(type)) {
                     String room = json.get("room").getAsString();
-                    List<String> history = chatHistories.getOrDefault(room, new ArrayList<>());
-                    
-                    JsonObject historyPkg = new JsonObject();
-                    historyPkg.addProperty("type", "HISTORY_RESPONSE");
-                    historyPkg.addProperty("room", room);
-                    historyPkg.add("messages", gson.toJsonTree(history));
-                    
-                    ctx.session.getRemote().sendString(gson.toJson(historyPkg));
-                }
-
-                // 6. User State Indicators
+                    ArrayList<String> hist = chatHistories.getOrDefault(room, new ArrayList<>());
+                    com.google.gson.JsonObject resp = new com.google.gson.JsonObject();
+                    resp.addProperty("type", "HISTORY_RESPONSE");
+                    resp.addProperty("room", room);
+                    resp.add("messages", new com.google.gson.Gson().toJsonTree(hist));
+                    ctx.send(resp.toString());
+                } 
+                
                 else if ("TYPING".equals(type)) {
-                    String receiver = json.get("receiver").getAsString().trim().toLowerCase();
-                    Session receiverSession = wsConnections.get(receiver);
-                    if (receiverSession != null && receiverSession.isOpen()) {
-                        receiverSession.getRemote().sendString(gson.toJson(json));
+                    String r = json.get("receiver").getAsString().trim().toLowerCase();
+                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
+                } 
+                
+                else if ("STATUS_UPDATE".equals(type)) {
+                    String r = json.get("receiver").getAsString().trim().toLowerCase();
+                    String room = json.get("room").getAsString();
+                    if ("READ".equals(json.get("status").getAsString())) {
+                        String k = socketOwners.get(ctx) + "_" + r;
+                        unreadCounts.put(k, 0);
                     }
+                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
                 }
             });
         });
+
+        app.start(7070);
     }
 
-    // --- Helper Functions & Database Utilities ---
+    // --- Core Database Utilities ---
 
-    private static String generateRoomKey(String user1, String user2) {
-        String[] arr = {user1.toLowerCase(), user2.toLowerCase()};
-        Arrays.sort(arr);
-        return arr[0] + "_" + arr[1];
+    private static void initializeDatabase(HashMap<String, String> ud, HashSet<String> ec, HashMap<String, ArrayList<String>> ch) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS messages (room_key TEXT, token TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, base64 TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT)");
+
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
+                while (rs.next()) ud.put(rs.getString("username"), rs.getString("password"));
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM connections")) {
+                while (rs.next()) {
+                    String u1 = rs.getString("user1");
+                    String u2 = rs.getString("user2");
+                    String[] arr = {u1, u2}; java.util.Arrays.sort(arr);
+                    ec.add(arr[0] + "_" + arr[1]);
+                }
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM messages")) {
+                while (rs.next()) {
+                    String r = rs.getString("room_key");
+                    String t = rs.getString("token");
+                    if (!ch.containsKey(r)) ch.put(r, new ArrayList<>());
+                    ch.get(r).add(t);
+                }
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM profile_pics")) {
+                while (rs.next()) userProfilePics.put(rs.getString("username"), rs.getString("base64"));
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM subscriptions")) {
+                while (rs.next()) userSubscriptions.put(rs.getString("username"), rs.getString("sub_json"));
+            }
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static String capitalizeFirstLetter(String original) {
-        if (original == null || original.isEmpty()) return original;
-        return original.substring(0, 1).toUpperCase() + original.substring(1);
-    }
-
-    private static void initializeDatabase() {
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             Statement stmt = conn.createStatement()) {
-            
-            // Core connections matrix table mapping authorized peer handshakes
-            stmt.execute("CREATE TABLE IF NOT EXISTS connections (" +
-                    "user1 TEXT, " +
-                    "user2 TEXT, " +
-                    "PRIMARY KEY(user1, user2))");
-
-            // Transaction records processing table log
-            stmt.execute("CREATE TABLE IF NOT EXISTS messages (" +
-                    "room TEXT, " +
-                    "payload TEXT, " +
-                    "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)");
-            
-            System.out.println("[Database] Core engine tables verified/initialized.");
-        } catch (SQLException e) {
-            System.err.println("[Database Initialization Error] " + e.getMessage());
-        }
+    private static void saveUserToDatabase(String u, String p) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO users VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
     private static void saveConnectionToDatabase(String u1, String u2) {
-        String user1 = u1.toLowerCase();
-        String user2 = u2.toLowerCase();
-        if (user1.compareTo(user2) > 0) {
-            String temp = user1; user1 = user2; user2 = temp;
-        }
-
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement ps = conn.prepareStatement(
-                     "INSERT OR IGNORE INTO connections (user1, user2) VALUES (?, ?)")) {
-            ps.setString(1, user1);
-            ps.setString(2, user2);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("[Database Error] Saving relationship context failed: " + e.getMessage());
-        }
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR IGNORE INTO connections VALUES (?, ?)")) {
+            ps.setString(1, u1); ps.setString(2, u2); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static boolean checkConnectionInDatabase(String u1, String u2) {
-        String user1 = u1.toLowerCase();
-        String user2 = u2.toLowerCase();
-        if (user1.compareTo(user2) > 0) {
-            String temp = user1; user1 = user2; user2 = temp;
-        }
-
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT 1 FROM connections WHERE user1 = ? AND user2 = ?")) {
-            ps.setString(1, user1);
-            ps.setString(2, user2);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next(); // Returns true if a historical valid handshake exists
-            }
-        } catch (SQLException e) {
-            System.err.println("[Database Error] Connection check fallback routine errored: " + e.getMessage());
-            return false;
-        }
+    private static void saveMessageToDatabase(String r, String t) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT INTO messages (room_key, token) VALUES (?, ?)")) {
+            ps.setString(1, r); ps.setString(2, t); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void saveMessageToDatabase(String room, String payload) {
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO messages (room, payload) VALUES (?, ?)")) {
-            ps.setString(1, room);
-            ps.setString(2, payload);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("[Database Error] Storing transmission log failed: " + e.getMessage());
-        }
+    private static void saveProfilePicToDatabase(String u, String p) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO profile_pics VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+    
+    private static void saveSubscriptionToDatabase(String u, String s) {
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO subscriptions VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, s); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    private static void sendWebPushNotification(String recipient, String title, String body) {
-        // Log target mock method hook for Web Push Notification subsystem payloads
-        System.out.println("[Web Push Trigger] Destination: " + recipient + " | Head: " + title + " | Body: " + body);
+    private static String capitalizeFirstLetter(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 }
