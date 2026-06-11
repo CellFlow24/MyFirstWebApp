@@ -33,14 +33,29 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // 1. NEVER cache or intercept API calls. 
+  // If an API call fails due to a network switch, we want it to fail 
+  // naturally so your app's "Retry" logic can handle it.
   if (event.request.url.includes('/api/')) return;
+
+  // 2. Only cache GET requests.
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    // Use 'network-first' strategy for core assets
+    fetch(event.request)
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request);
+        return cachedResponse || Response.error();
+      })
   );
 });
-
+// Listen for connectivity changes
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 self.addEventListener('push', event => {
   const promise = (async () => {
     let title = 'Dipsum';
