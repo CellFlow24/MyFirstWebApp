@@ -829,70 +829,39 @@
     // =========================================================================
 
     function setupPushNotifications(username) {
-        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.log("Push not supported on this browser.");
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log("Push not supported on this browser.");
+        return;
+    }
+
+    Notification.requestPermission().then(permission => {
+        if (permission !== 'granted') {
+            console.warn('Notification permission denied.');
             return;
         }
 
-        Notification.requestPermission().then(permission => {
-            if (permission !== 'granted') {
-                console.warn('Notification permission denied.');
-                return;
-            }
-
-            // Wait for SW to be fully ready before subscribing
-            navigator.serviceWorker.ready.then(registration => {
-                registration.pushManager.getSubscription().then(existingSub => {
-                    if (existingSub) {
-                        // Unsubscribe the old one, then get a fresh one
-                        existingSub.unsubscribe().then(() => subscribeAndSend(registration, username));
-                    } else {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.pushManager.getSubscription().then(existingSub => {
+                if (existingSub) {
+                    // Always refresh subscription in case IP/network changed
+                    existingSub.unsubscribe().then(() => {
                         subscribeAndSend(registration, username);
-                    }
-                });
-
-                    const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
-
-                    registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-                    }).then(newSub => {
-                        console.log('Push subscription created!');
-                        sendSubscriptionToServer(newSub, username);
-                    }).catch(err => {
-                        console.error('Push subscribe failed:', err);
-                    });
-                }).catch(err => console.error("Push setup error:", err));
-            });
+                    }).catch(() => subscribeAndSend(registration, username));
+                } else {
+                    subscribeAndSend(registration, username);
+                }
+            }).catch(err => console.error("Push setup error:", err));
         });
-    }
-    
-    function sendSubscriptionToServer(subscription, username) {
-        fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription)
-        }).then(res => res.text()).then(statusText => console.log("System Push Registration Sync status:", statusText))
-          .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
-    }
+    });
+}
 
-    function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    }
-    
-    function subscribeAndSend(registration, username) {
+function subscribeAndSend(registration, username) {
     const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
     registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
     }).then(newSub => {
+        console.log('Push subscription refreshed!');
         sendSubscriptionToServer(newSub, username);
     }).catch(err => console.error('Push subscribe failed:', err));
 }
