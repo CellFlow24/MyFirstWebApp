@@ -415,25 +415,31 @@
     const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
     // ==========================================
-    // 1. Fetch Directory (With Anti-Stacking Lock & Timeout)
+    // 1. Fetch Directory (With Anti-Stacking Lock & Atomic Render)
     // ==========================================
     if (!isSyncingDirectory) {
         isSyncingDirectory = true;
         
-        // Create a 5-second kill switch
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`, { signal: controller.signal })
             .then(res => res.text())
             .then(rawText => {
-                clearTimeout(timeoutId); // Clear the kill switch if successful
+                clearTimeout(timeoutId); 
                 const listContainer = document.getElementById('userListContainer');
                 if (!listContainer) return;
-                listContainer.innerHTML = "";
-                if(!rawText || rawText.trim() === "") return;
+                
+                // If the server returns empty, wipe the list and stop
+                if(!rawText || rawText.trim() === "") {
+                    listContainer.innerHTML = "";
+                    return;
+                }
 
                 let currentCycleUnreadSum = 0; 
+                
+                // 🛠️ THE FIX: Build a single HTML string in memory instead of modifying the live DOM in a loop
+                let newHtmlBuilder = ""; 
 
                 rawText.split('$$$').forEach(userToken => {
                     if (!userToken || userToken.trim() === "") return;
@@ -465,18 +471,12 @@
                                 myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
                             }
                         }
-                        return;
+                        return; // Skip rendering ourselves
                     }
 
                     if (cleanName === activeChatTarget) {
                         updateHeaderUserStatusIndicator(isOnline);
                     }
-
-                    const row = document.createElement('div');
-                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
-
-                    row.dataset.avatarData = customAvatarPic;
-                    row.onclick = () => openTargetChatWindow(cleanName);
 
                     const statusClass = isOnline ? "status-online" : "status-offline";
                     let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
@@ -498,17 +498,24 @@
                                 onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
                     }
 
-                    row.innerHTML = `
-                        <div style="display: flex; align-items: center; position: relative;">
-                            <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
-                            ${dpContentHtml}
-                            <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
-                            ${unreadBadgeHtml}
+                    // Append the raw HTML block directly to our string builder
+                    newHtmlBuilder += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;"
+                             data-avatar-data="${customAvatarPic}"
+                             onclick="openTargetChatWindow('${cleanName}')">
+                            <div style="display: flex; align-items: center; position: relative;">
+                                <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                                ${dpContentHtml}
+                                <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                                ${unreadBadgeHtml}
+                            </div>
+                            ${actionComponentHtml}
                         </div>
-                        ${actionComponentHtml}
                     `;
-                    listContainer.appendChild(row);
                 });
+
+                // 🛠️ THE FIX: Inject the complete string all at once. This safely destroys any duplicates in the browser.
+                listContainer.innerHTML = newHtmlBuilder;
 
                 if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
                     backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
@@ -519,10 +526,9 @@
                 if (err.name === 'AbortError') console.warn("Directory sync timed out (Network shift).");
             })
             .finally(() => {
-                isSyncingDirectory = false; // Unlock the next cycle
+                isSyncingDirectory = false; // Always unlock for the next cycle
             });
     }
-
     // ==========================================
     // 2. Fetch Active Chat Messages (If open)
     // ==========================================
