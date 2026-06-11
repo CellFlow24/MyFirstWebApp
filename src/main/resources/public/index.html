@@ -266,7 +266,9 @@
     let currentInviteSender = null;
     let isSignUpMode = false;
     let activeChatTarget = null; 
-    let currentLoadedMessageCount = 0; 
+    let currentLoadedMessageCount = 0;
+    let isSyncingDirectory = false;
+    let isSyncingInvites = false;
 
     window.addEventListener('DOMContentLoaded', () => {
         const savedSessionUser = localStorage.getItem('dipsum_logged_user');
@@ -412,125 +414,155 @@
     function syncCycle() {
     const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
-    // 1. Fetch and Update User Directory
-    fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
-        .then(res => res.text())
-        .then(rawText => {
-            const listContainer = document.getElementById('userListContainer');
-            if (!listContainer) return;
-            listContainer.innerHTML = "";
-            if(!rawText || rawText.trim() === "") return;
+    // ==========================================
+    // 1. Fetch Directory (With Anti-Stacking Lock & Timeout)
+    // ==========================================
+    if (!isSyncingDirectory) {
+        isSyncingDirectory = true;
+        
+        // Create a 5-second kill switch
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            let currentCycleUnreadSum = 0; 
+        fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`, { signal: controller.signal })
+            .then(res => res.text())
+            .then(rawText => {
+                clearTimeout(timeoutId); // Clear the kill switch if successful
+                const listContainer = document.getElementById('userListContainer');
+                if (!listContainer) return;
+                listContainer.innerHTML = "";
+                if(!rawText || rawText.trim() === "") return;
 
-            rawText.split('$$$').forEach(userToken => {
-                if (!userToken || userToken.trim() === "") return;
+                let currentCycleUnreadSum = 0; 
 
-                const parts = userToken.split('###');
-                if (parts.length < 5) return;
+                rawText.split('$$$').forEach(userToken => {
+                    if (!userToken || userToken.trim() === "") return;
 
-                const targetUser = parts[0].trim();
-                const isOnline = parts[1].trim() === "true";
-                const unreadCount = parseInt(parts[2].trim(), 10);
-                const relationshipStatus = parts[3].trim();
-                let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
-                const cleanName = targetUser.toLowerCase();
+                    const parts = userToken.split('###');
+                    if (parts.length < 5) return;
 
-                if (cleanName !== activeChatTarget) {
-                    currentCycleUnreadSum += unreadCount;
-                }
+                    const targetUser = parts[0].trim();
+                    const isOnline = parts[1].trim() === "true";
+                    const unreadCount = parseInt(parts[2].trim(), 10);
+                    const relationshipStatus = parts[3].trim();
+                    let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
+                    const cleanName = targetUser.toLowerCase();
 
-                if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
-                    customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
-                }
-
-                if(cleanName === user) {
-                    const myAvatarElement = document.getElementById('myProfileAvatarElement');
-                    if (myAvatarElement) {
-                        if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
-                            myAvatarElement.innerHTML = `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
-                        } else {
-                            myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
-                        }
+                    if (cleanName !== activeChatTarget) {
+                        currentCycleUnreadSum += unreadCount;
                     }
-                    return;
+
+                    if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
+                        customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
+                    }
+
+                    if(cleanName === user) {
+                        const myAvatarElement = document.getElementById('myProfileAvatarElement');
+                        if (myAvatarElement) {
+                            if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                                myAvatarElement.innerHTML = `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            } else {
+                                myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
+                            }
+                        }
+                        return;
+                    }
+
+                    if (cleanName === activeChatTarget) {
+                        updateHeaderUserStatusIndicator(isOnline);
+                    }
+
+                    const row = document.createElement('div');
+                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
+
+                    row.dataset.avatarData = customAvatarPic;
+                    row.onclick = () => openTargetChatWindow(cleanName);
+
+                    const statusClass = isOnline ? "status-online" : "status-offline";
+                    let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
+
+                    let dpContentHtml = "";
+                    if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                        dpContentHtml = `<img src="${customAvatarPic}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; display: block;">`;
+                    } else {
+                        dpContentHtml = `<div class="sidebar-dp-avatar" style="background:#334155; color:#94a3b8; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
+                    }
+
+                    let actionComponentHtml = "";
+                    if (relationshipStatus === "CONNECTED") {
+                        actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
+                    } else if (relationshipStatus === "PENDING") {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
+                    } else {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
+                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
+                    }
+
+                    row.innerHTML = `
+                        <div style="display: flex; align-items: center; position: relative;">
+                            <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                            ${dpContentHtml}
+                            <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                            ${unreadBadgeHtml}
+                        </div>
+                        ${actionComponentHtml}
+                    `;
+                    listContainer.appendChild(row);
+                });
+
+                if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
+                    backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
                 }
-
-                if (cleanName === activeChatTarget) {
-                    updateHeaderUserStatusIndicator(isOnline);
-                }
-
-                const row = document.createElement('div');
-                row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
-
-                row.dataset.avatarData = customAvatarPic;
-                row.onclick = () => openTargetChatWindow(cleanName);
-
-                const statusClass = isOnline ? "status-online" : "status-offline";
-                let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
-
-                let dpContentHtml = "";
-                if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
-                    dpContentHtml = `<img src="${customAvatarPic}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; display: block;">`;
-                } else {
-                    dpContentHtml = `<div class="sidebar-dp-avatar" style="background:#334155; color:#94a3b8; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
-                }
-
-                let actionComponentHtml = "";
-                if (relationshipStatus === "CONNECTED") {
-                    actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
-                } else if (relationshipStatus === "PENDING") {
-                    actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
-                } else {
-                    actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
-                            onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
-                }
-
-                row.innerHTML = `
-                    <div style="display: flex; align-items: center; position: relative;">
-                        <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
-                        ${dpContentHtml}
-                        <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
-                        ${unreadBadgeHtml}
-                    </div>
-                    ${actionComponentHtml}
-                `;
-                listContainer.appendChild(row);
+                totalUnreadMessagesTracked = currentCycleUnreadSum;
+            })
+            .catch(err => {
+                if (err.name === 'AbortError') console.warn("Directory sync timed out (Network shift).");
+            })
+            .finally(() => {
+                isSyncingDirectory = false; // Unlock the next cycle
             });
+    }
 
-            if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
-                backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
-            }
-            totalUnreadMessagesTracked = currentCycleUnreadSum;
-        })
-        .catch(err => {
-            console.warn("Directory synchronization paused: Network or IP transitioning.", err);
-        });
-
-    // 2. Fetch Active Chat Window Messages (If open)
+    // ==========================================
+    // 2. Fetch Active Chat Messages (If open)
+    // ==========================================
     if (activeChatTarget) {
+        // Assuming fetchActiveChatMessages handles its own locks if needed, 
+        // but short polling chat is usually okay.
         fetchActiveChatMessages(user, activeChatTarget);
     }
 
-    // 3. Fetch Pending Room Invitations
-    fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`)
-        .then(res => res.text())
-        .then(response => {
-            const modal = document.getElementById('inviteModal');
-            if (response.startsWith("PENDING:")) {
-                const sender = response.split(":")[1];
-                if(!modal.classList.contains('active')) {
-                    currentInviteSender = sender;
-                    document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(sender)}</b> wants to start a live chat session with you.`;
-                    modal.classList.add('active');
-                }
-            }
-        })
-        .catch(err => {
-            console.warn("Invitation processing paused: Network or IP transitioning.", err);
-        });
-}
+    // ==========================================
+    // 3. Fetch Pending Invites (With Anti-Stacking Lock)
+    // ==========================================
+    if (!isSyncingInvites) {
+        isSyncingInvites = true;
+        
+        const inviteController = new AbortController();
+        const inviteTimeoutId = setTimeout(() => inviteController.abort(), 5000);
 
+        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`, { signal: inviteController.signal })
+            .then(res => res.text())
+            .then(response => {
+                clearTimeout(inviteTimeoutId);
+                const modal = document.getElementById('inviteModal');
+                if (response.startsWith("PENDING:")) {
+                    const sender = response.split(":")[1];
+                    if(!modal.classList.contains('active')) {
+                        currentInviteSender = sender;
+                        document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(sender)}</b> wants to start a live chat session with you.`;
+                        modal.classList.add('active');
+                    }
+                }
+            })
+            .catch(err => {
+                 if (err.name === 'AbortError') console.warn("Invite sync timed out (Network shift).");
+            })
+            .finally(() => {
+                isSyncingInvites = false;
+            });
+    }
+}
     function sendChatInvite(targetUsername) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
