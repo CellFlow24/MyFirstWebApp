@@ -124,7 +124,7 @@ public class Main {
             }
         });
 
-        // 🔔 NEW: Receive and store browser PWA subscription contexts
+        // 🔔 Receive and store browser PWA subscription contexts
         app.post("/api/saveSubscription", ctx -> {
             String username = ctx.queryParam("username");
             String subscriptionJson = ctx.body();
@@ -189,8 +189,9 @@ public class Main {
                     String room = json.get("room").getAsString();
                     activeInvites.put(room, s);
 
-                    if (activeSockets.containsKey(r)) {
-                        activeSockets.get(r).send(text);
+                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    if (rCtx != null && rCtx.session.isOpen()) {
+                        rCtx.send(text);
                     }
                 } 
                 
@@ -202,8 +203,11 @@ public class Main {
                     saveConnectionToDatabase(s, r);
                     establishedConnections.add(room);
 
-                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
-                    if (activeSockets.containsKey(s)) activeSockets.get(s).send(text);
+                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsConnectContext sCtx = activeSockets.get(s);
+                    
+                    if (rCtx != null && rCtx.session.isOpen()) rCtx.send(text);
+                    if (sCtx != null && sCtx.session.isOpen()) sCtx.send(text);
                 } 
                 
                 else if ("TEXT".equals(type) || "MEDIA".equals(type)) {
@@ -211,7 +215,7 @@ public class Main {
                     String s = json.get("sender").getAsString().trim().toLowerCase();
                     String r = json.get("receiver").getAsString().trim().toLowerCase();
 
-                    // 🔥 WORKOUT FALLBACK CHECK: Look up existing connections table inside chatlounge.db
+                    // Fallback database lookup check
                     boolean isConnected = establishedConnections.contains(room);
                     if (!isConnected) {
                         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -222,7 +226,7 @@ public class Main {
                             try (ResultSet rs = ps.executeQuery()) {
                                 if (rs.next()) {
                                     isConnected = true;
-                                    establishedConnections.add(room); // Restore to active RAM memory mapping cache
+                                    establishedConnections.add(room);
                                 }
                             }
                         } catch (SQLException ex) {
@@ -235,36 +239,44 @@ public class Main {
                         alert.addProperty("type", "INVITE");
                         alert.addProperty("sender", s);
                         alert.addProperty("room", room);
-                        if (activeSockets.containsKey(r)) {
-                            activeSockets.get(r).send(alert.toString());
+                        
+                        io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                        if (rCtx != null && rCtx.session.isOpen()) {
+                            rCtx.send(alert.toString());
                         }
-                        return; // Block execution to keep unverified routes silent
+                        return; 
                     }
 
                     saveMessageToDatabase(room, text);
                     if (!chatHistories.containsKey(room)) chatHistories.put(room, new ArrayList<>());
                     chatHistories.get(room).add(text);
 
-                    if (activeSockets.containsKey(r)) {
+                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsConnectContext sCtx = activeSockets.get(s);
+
+                    // 🛠️ FIX LOGIC FOR CRASH: Check if targets are fully initialized and open before invoking .send()
+                    if (rCtx != null && rCtx.session.isOpen()) {
                         json.addProperty("status", "DELIVERED");
-                        activeSockets.get(r).send(json.toString());
+                        rCtx.send(json.toString());
                         
-                        if (activeSockets.containsKey(s)) {
+                        if (sCtx != null && sCtx.session.isOpen()) {
                             com.google.gson.JsonObject upd = new com.google.gson.JsonObject();
                             upd.addProperty("type", "STATUS_UPDATE");
                             upd.addProperty("room", room);
                             upd.addProperty("sender", r);
                             upd.addProperty("status", "DELIVERED");
-                            activeSockets.get(s).send(upd.toString());
+                            sCtx.send(upd.toString());
                         }
                     } else {
                         json.addProperty("status", "SENT");
-                        if (activeSockets.containsKey(s)) activeSockets.get(s).send(json.toString());
+                        if (sCtx != null && sCtx.session.isOpen()) {
+                            sCtx.send(json.toString());
+                        }
                         
                         String k = r + "_" + s;
                         unreadCounts.put(k, unreadCounts.getOrDefault(k, 0) + 1);
 
-                        // 🔔 TRIGGER NATIVE TELEPHONY WEB PUSH ENGINE
+                        // Trigger Web Push Notification Engine fallback
                         String pushJson = userSubscriptions.get(r);
                         if (pushJson != null) {
                             try {
@@ -297,7 +309,10 @@ public class Main {
                 
                 else if ("TYPING".equals(type)) {
                     String r = json.get("receiver").getAsString().trim().toLowerCase();
-                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
+                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    if (rCtx != null && rCtx.session.isOpen()) {
+                        rCtx.send(text);
+                    }
                 } 
                 
                 else if ("STATUS_UPDATE".equals(type)) {
@@ -307,7 +322,10 @@ public class Main {
                         String k = socketOwners.get(ctx) + "_" + r;
                         unreadCounts.put(k, 0);
                     }
-                    if (activeSockets.containsKey(r)) activeSockets.get(r).send(text);
+                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    if (rCtx != null && rCtx.session.isOpen()) {
+                        rCtx.send(text);
+                    }
                 }
             });
         });
