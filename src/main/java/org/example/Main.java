@@ -141,11 +141,12 @@ public class Main {
         // --- WEB SOCKET ROUTING PIPELINE ---
 
         app.ws("/ws", ws -> {
-            ConcurrentHashMap<String, io.javalin.websocket.WsConnectContext> activeSockets = new ConcurrentHashMap<>();
+            // 🛠️ FIX: Explicitly use WsContext for all collections to guarantee type compatibility
+            ConcurrentHashMap<String, io.javalin.websocket.WsContext> activeSockets = new ConcurrentHashMap<>();
             ConcurrentHashMap<io.javalin.websocket.WsContext, String> socketOwners = new ConcurrentHashMap<>();
 
             ws.onConnect(ctx -> {
-                // Connection initiated
+                // Connection initiated cleanly
             });
 
             ws.onClose(ctx -> {
@@ -189,7 +190,7 @@ public class Main {
                     String room = json.get("room").getAsString();
                     activeInvites.put(room, s);
 
-                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                     if (rCtx != null && rCtx.session.isOpen()) {
                         rCtx.send(text);
                     }
@@ -203,8 +204,8 @@ public class Main {
                     saveConnectionToDatabase(s, r);
                     establishedConnections.add(room);
 
-                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
-                    io.javalin.websocket.WsConnectContext sCtx = activeSockets.get(s);
+                    io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsContext sCtx = activeSockets.get(s);
                     
                     if (rCtx != null && rCtx.session.isOpen()) rCtx.send(text);
                     if (sCtx != null && sCtx.session.isOpen()) sCtx.send(text);
@@ -240,7 +241,7 @@ public class Main {
                         alert.addProperty("sender", s);
                         alert.addProperty("room", room);
                         
-                        io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                        io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                         if (rCtx != null && rCtx.session.isOpen()) {
                             rCtx.send(alert.toString());
                         }
@@ -251,10 +252,9 @@ public class Main {
                     if (!chatHistories.containsKey(room)) chatHistories.put(room, new ArrayList<>());
                     chatHistories.get(room).add(text);
 
-                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
-                    io.javalin.websocket.WsConnectContext sCtx = activeSockets.get(s);
+                    io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsContext sCtx = activeSockets.get(s);
 
-                    // 🛠️ FIX LOGIC FOR CRASH: Check if targets are fully initialized and open before invoking .send()
                     if (rCtx != null && rCtx.session.isOpen()) {
                         json.addProperty("status", "DELIVERED");
                         rCtx.send(json.toString());
@@ -309,7 +309,7 @@ public class Main {
                 
                 else if ("TYPING".equals(type)) {
                     String r = json.get("receiver").getAsString().trim().toLowerCase();
-                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                     if (rCtx != null && rCtx.session.isOpen()) {
                         rCtx.send(text);
                     }
@@ -322,7 +322,7 @@ public class Main {
                         String k = socketOwners.get(ctx) + "_" + r;
                         unreadCounts.put(k, 0);
                     }
-                    io.javalin.websocket.WsConnectContext rCtx = activeSockets.get(r);
+                    io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                     if (rCtx != null && rCtx.session.isOpen()) {
                         rCtx.send(text);
                     }
