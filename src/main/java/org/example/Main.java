@@ -141,7 +141,6 @@ public class Main {
         // --- WEB SOCKET ROUTING PIPELINE ---
 
         app.ws("/ws", ws -> {
-            // 🛠️ FIX: Explicitly use WsContext for all collections to guarantee type compatibility
             ConcurrentHashMap<String, io.javalin.websocket.WsContext> activeSockets = new ConcurrentHashMap<>();
             ConcurrentHashMap<io.javalin.websocket.WsContext, String> socketOwners = new ConcurrentHashMap<>();
 
@@ -150,7 +149,7 @@ public class Main {
             });
 
             ws.onClose(ctx -> {
-                String u = socketOwners.remove(ctx);
+                String u = socketOwners.remove((io.javalin.websocket.WsContext) ctx);
                 if (u != null) activeSockets.remove(u);
             });
 
@@ -191,7 +190,7 @@ public class Main {
                     activeInvites.put(room, s);
 
                     io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
-                    if (rCtx != null && rCtx.session.isOpen()) {
+                    if (rCtx != null && rCtx.session().isOpen()) {
                         rCtx.send(text);
                     }
                 } 
@@ -207,8 +206,8 @@ public class Main {
                     io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                     io.javalin.websocket.WsContext sCtx = activeSockets.get(s);
                     
-                    if (rCtx != null && rCtx.session.isOpen()) rCtx.send(text);
-                    if (sCtx != null && sCtx.session.isOpen()) sCtx.send(text);
+                    if (rCtx != null && rCtx.session().isOpen()) rCtx.send(text);
+                    if (sCtx != null && sCtx.session().isOpen()) sCtx.send(text);
                 } 
                 
                 else if ("TEXT".equals(type) || "MEDIA".equals(type)) {
@@ -242,7 +241,7 @@ public class Main {
                         alert.addProperty("room", room);
                         
                         io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
-                        if (rCtx != null && rCtx.session.isOpen()) {
+                        if (rCtx != null && rCtx.session().isOpen()) {
                             rCtx.send(alert.toString());
                         }
                         return; 
@@ -255,11 +254,11 @@ public class Main {
                     io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
                     io.javalin.websocket.WsContext sCtx = activeSockets.get(s);
 
-                    if (rCtx != null && rCtx.session.isOpen()) {
+                    if (rCtx != null && rCtx.session().isOpen()) {
                         json.addProperty("status", "DELIVERED");
                         rCtx.send(json.toString());
                         
-                        if (sCtx != null && sCtx.session.isOpen()) {
+                        if (sCtx != null && sCtx.session().isOpen()) {
                             com.google.gson.JsonObject upd = new com.google.gson.JsonObject();
                             upd.addProperty("type", "STATUS_UPDATE");
                             upd.addProperty("room", room);
@@ -269,7 +268,7 @@ public class Main {
                         }
                     } else {
                         json.addProperty("status", "SENT");
-                        if (sCtx != null && sCtx.session.isOpen()) {
+                        if (sCtx != null && sCtx.session().isOpen()) {
                             sCtx.send(json.toString());
                         }
                         
@@ -310,7 +309,7 @@ public class Main {
                 else if ("TYPING".equals(type)) {
                     String r = json.get("receiver").getAsString().trim().toLowerCase();
                     io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
-                    if (rCtx != null && rCtx.session.isOpen()) {
+                    if (rCtx != null && rCtx.session().isOpen()) {
                         rCtx.send(text);
                     }
                 } 
@@ -319,11 +318,11 @@ public class Main {
                     String r = json.get("receiver").getAsString().trim().toLowerCase();
                     String room = json.get("room").getAsString();
                     if ("READ".equals(json.get("status").getAsString())) {
-                        String k = socketOwners.get(ctx) + "_" + r;
+                        String k = socketOwners.get((io.javalin.websocket.WsContext) ctx) + "_" + r;
                         unreadCounts.put(k, 0);
                     }
                     io.javalin.websocket.WsContext rCtx = activeSockets.get(r);
-                    if (rCtx != null && rCtx.session.isOpen()) {
+                    if (rCtx != null && rCtx.session().isOpen()) {
                         rCtx.send(text);
                     }
                 }
