@@ -37,12 +37,12 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
-      .catch(async () => {
-        // Only return cached content if it exists, otherwise return a simple fallback
-        const cachedResponse = await caches.match(event.request);
+    fetch(event.request).catch(() => {
+      // Replaced 'async/await' with a standard Promise chain to clear IDE syntax errors
+      return caches.match(event.request).then(cachedResponse => {
         return cachedResponse || new Response('Offline', { status: 503 });
-      })
+      });
+    })
   );
 });
 
