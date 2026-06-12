@@ -315,8 +315,9 @@ public class Main {
         String port = System.getenv("PORT");
         int portNumber = (port != null) ? Integer.parseInt(port) : 7070;
 
-        // Binding to "0.0.0.0" ensures the app is accessible on all interfaces
-        app.start("0.0.0.0", portNumber);
+        // Just pass the portNumber! 
+        // Javalin automatically defaults to "0.0.0.0" (all network interfaces) under the hood.
+        app.start(portNumber);
         System.out.println("✅ Server started and listening on all interfaces at port " + portNumber);
 
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
