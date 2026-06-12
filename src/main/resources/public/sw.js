@@ -38,7 +38,6 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     fetch(event.request).catch(() => {
-      // Replaced 'async/await' with a standard Promise chain to clear IDE syntax errors
       return caches.match(event.request).then(cachedResponse => {
         return cachedResponse || new Response('Offline', { status: 503 });
       });
@@ -52,38 +51,38 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
+
+// FIXED: Removed the async/await execution wrapper to satisfy the IDE validator
 self.addEventListener('push', event => {
-  const promise = (async () => {
-    let title = 'Dipsum';
-    let body = 'You have a new message';
-    let url = '/';
+  let title = 'Dipsum';
+  let body = 'You have a new message';
+  let url = '/';
 
-    if (event.data) {
-      try {
-        const data = event.data.json();
-        title = data.title || title;
-        body = data.body || body;
-        url = data.url || url;
-      } catch (e) {
-        body = event.data.text();
-      }
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      title = data.title || title;
+      body = data.body || body;
+      url = data.url || url;
+    } catch (e) {
+      body = event.data.text();
     }
+  }
 
-    // Force show - this bypasses Chrome's quiet notification UI
-    await self.registration.showNotification(title, {
-      body: body,
-      icon: '/dipsum-logo.png',
-      badge: '/dipsum-logo.png',
-      vibrate: [300, 100, 300, 100, 300],
-      requireInteraction: true,
-      tag: 'dipsum-msg-' + Date.now(), // ✅ Unique tag = every message shows separately
-      renotify: true,
-      silent: false,
-      data: { url: url }
-    });
-  })();
+  // Force show - showNotification returns a Promise chain naturally
+  const promise = self.registration.showNotification(title, {
+    body: body,
+    icon: '/dipsum-logo.png',
+    badge: '/dipsum-logo.png',
+    vibrate: [300, 100, 300, 100, 300],
+    requireInteraction: true,
+    tag: 'dipsum-msg-' + Date.now(), // Unique tag = every message shows separately
+    renotify: true,
+    silent: false,
+    data: { url: url }
+  });
 
-  // CRITICAL: Must pass the promise or Android kills the SW before notification shows
+  // CRITICAL: Keeps the service worker alive until the notification displays
   event.waitUntil(promise);
 });
 
