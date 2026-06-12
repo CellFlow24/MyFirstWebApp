@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Enterprise Control Dashboard</title>
     <style>
+        /*
+         * DIPSUM APP COLOR SCHEME - LOGO-INSPIRED CUTE-THEME UPDATE
+         */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #d1e49c; 
@@ -22,378 +25,872 @@
         }
         .app-card {
             background-color: #fffdf5; border: none; padding: 30px;
-            border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            width: 100%; max-width: 400px; text-align: center; box-sizing: border-box;
+            border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: center;
         }
-        .action-btn {
-            width: 100%; padding: 12px; background-color: #aad052;
-            color: white; border: none; border-radius: 6px;
-            font-size: 16px; font-weight: bold; cursor: pointer;
-            transition: background 0.2s ease;
+        h2 { margin-top: 0; font-size: 24px; font-weight: 600; color: #aad052; } 
+        p { color: #ffc8b0; font-size: 14px; margin-bottom: 30px; line-height: 1.5; } 
+
+        .sync-btn {
+            background: #aad052; color: white; border: none; padding: 14px;
+            font-size: 15px; font-weight: 600; border-radius: 8px;
+            cursor: pointer; width: 100%; transition: transform 0.1s ease;
         }
-        .action-btn:hover { background-color: #94b93b; }
-        .secondary-link {
-            display: inline-block; margin-top: 15px; color: #7a9c2b;
-            text-decoration: none; font-size: 14px;
+        .sync-btn:active { transform: scale(0.98); }
+
+        .lounge-container {
+            display: flex; width: 900px; height: 600px; background: #fffdf5;       
+            border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); overflow: hidden;
         }
-        .secondary-link:hover { text-decoration: underline; }
-        .hidden-panel { display: none; }
-        
-        /* Layout structures for main interface */
-        .dashboard-container {
-            display: flex; flex-direction: column; width: 100vw; height: 100vh; background: #fffdf5;
+        .lounge-sidebar {
+            width: 30%; background-color: #fffdf5; padding: 20px;
+            border-right: 1px solid #d1e49c; 
         }
-        .app-header {
-            background-color: #aad052; color: white; padding: 15px;
-            display: flex; justify-content: space-between; align-items: center; font-weight: bold;
+        .lounge-main {
+            width: 70%; display: flex; justify-content: center; align-items: center;
+            color: #334155; text-align: center; background-color: #fffdf5; 
         }
-        .main-workspace { display: flex; flex: 1; overflow: hidden; }
-        .sidebar-panel {
-            width: 30%; border-right: 1px solid #e2e8f0; display: flex;
-            flex-direction: column; background: #fffdf5;
+        .profile-section { display: flex; align-items: center; gap: 12px; }
+        .dp-circle {
+            width: 45px; height: 45px; background-color: #aad052;  
+            border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; font-size: 20px; color: white;
         }
-        .user-list-box { flex: 1; overflow-y: auto; }
-        .user-item {
-            padding: 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer;
-            display: flex; align-items: center; gap: 10px; transition: background 0.2s;
+
+        /* MODAL LAYOUT */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(209, 228, 156, 0.85); backdrop-filter: blur(4px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
         }
-        .user-item:hover { background: #f8fafc; }
-        .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
-            background: #cbd5e1; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .modal-box {
+            background: #fffdf5; border: 1px solid #aad052; padding: 30px;
+            border-radius: 12px; width: 340px; text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3); transform: scale(0.9); transition: transform 0.3s ease;
         }
-        .online-dot { width: 100px; height: 10px; border-radius: 50%; background: #ef4444; }
-        .online-dot.active { background: #22c55e; }
-        
-        .chat-panel { width: 70%; display: flex; flex-direction: column; background: #f8fafc; }
-        .chat-body { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+
+        .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+        .btn-accept { flex: 1; background: #22c55e; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-decline { flex: 1; background: #ffc8b0; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-online { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; } 
+        .status-offline { background-color: #94a3b8; } 
+
+        .unread-badge {
+            background-color: #8a0c3c; color: white; font-size: 11px; font-weight: bold;
+            padding: 2px 7px; border-radius: 10px; margin-left: 8px; display: inline-block;
+        }
+
+        .chat-window-pane { display: flex; flex-direction: column; width: 100%; height: 100%; background-color: #fffdf5; }
+        .chat-header-bar { padding: 10px 20px; background-color: #fffdf5; border-bottom: 1px solid #aad052; display: flex; align-items: center; }
+
+        .header-dp-avatar {
+            width: 45px; height: 45px; border-radius: 50%; background-color: #fffdf5; 
+            display: flex; align-items: center; justify-content: center; font-size: 22px;
+            margin-right: 15px; border: 2px solid #aad052; color: #aad052;
+        }
+
+        .header-meta-box { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
+        .header-profile-title { font-size: 16px; font-weight: 600; color: #334155; line-height: 1.2; }
+        .status-round-container { display: inline-flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+
+        .status-round-indicator {
+            width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block; transition: all 0.3s ease-in-out;
+        }
+        .status-round-indicator.online {
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.7); animation: statusRoundPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes statusRoundPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.12); opacity: 0.85; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .chat-log-display { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .chat-footer-input-bar { padding: 15px 20px; background-color: #fffdf5; border-top: 1px solid #aad052; display: flex; gap: 12px; }
+
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .msg-bubble {
-            max-width: 65%; padding: 10px 14px; border-radius: 12px;
-            font-size: 15px; line-height: 1.4; word-wrap: break-word;
+            max-width: 65%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4;
+            word-wrap: break-word; text-align: left; animation: slideInUp 0.2s ease-out forwards;
         }
-        .msg-bubble.sent { background: #aad052; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg-bubble.received { background: white; color: #334155; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #e2e8f0; }
-        
-        .chat-footer { padding: 15px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: center; }
-        .chat-input { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
-        .send-icon-btn { padding: 12px 20px; background: #aad052; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .attachment-label { padding: 10px; background: #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 18px; }
-        
-        .badge-count {
-            background: #ef4444; color: white; border-radius: 10px;
-            padding: 2px 7px; font-size: 11px; font-weight: bold; margin-left: auto;
+        .msg-outgoing { background: linear-gradient(135deg, #aad052 0%, #c1df7e 100%); color: #334155; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-incoming { background: linear-gradient(135deg, #fb9fa3 0%, #ffc8b0 100%); color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
+
+        #userListContainer { max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 4px; }
+        #userListContainer::-webkit-scrollbar, .chat-log-display::-webkit-scrollbar { width: 6px; }
+        #userListContainer::-webkit-scrollbar-thumb, .chat-log-display::-webkit-scrollbar-thumb { background: #d1e49c; border-radius: 10px; }
+
+        .sidebar-dp-avatar {
+            width: 38px; height: 38px; border-radius: 50%; background-color: #fffdf5; 
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
+            margin-right: 12px; border: 2px solid #aad052; flex-shrink: 0; color: #aad052;
         }
-        .profile-pic-container { position: relative; display: inline-block; margin-bottom: 15px; cursor: pointer; }
-        .profile-pic-preview { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid #aad052; }
-        .camera-overlay {
-            position: absolute; bottom: 0; right: 0; background: #aad052; color: white;
-            border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; font-size: 14px;
+
+        .emoji-drawer-panel {
+            display: flex; gap: 8px; background: #fffdf5; border: 1px solid #aad052; 
+            padding: 8px 12px; border-radius: 20px; position: absolute; bottom: 70px;
+            right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100;
+        }
+        .emoji-drawer-panel span { font-size: 20px; cursor: pointer; transition: transform 0.1s ease; }
+        .emoji-drawer-panel span:hover { transform: scale(1.3); }
+
+        .msg-bubble-media { max-width: 260px; border-radius: 8px; margin-top: 4px; border: 1px solid #ffc8b0; cursor: pointer; transition: opacity 0.2s; }
+        .msg-bubble-media:hover { opacity: 0.9; }
+
+        .tool-action-btn {
+            background: #fffdf5; border: 1px solid #aad052; color: #aad052; border-radius: 6px;
+            width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 18px; transition: all 0.2s;
+        }
+        .tool-action-btn:hover { background: #aad052; color: white; }
+
+        /* MOBILE RESPONSIVE OVERRIDES */
+        @media screen and (max-width: 768px) {
+            html, body { display: block !important; height: 100dvh !important; width: 100vw !important; overflow: hidden !important; position: fixed !important; top: 0; left: 0; }
+            .app-card { margin: 0 !important; width: 90% !important; max-width: 360px !important; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+            .lounge-container { position: fixed !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100vw !important; height: 100dvh !important; max-width: 100vw !important; border-radius: 0px !important; margin: 0 !important; box-shadow: none !important; overflow: hidden !important; background-color: #fffdf5 !important; }
+            .lounge-sidebar { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; width: 100vw !important; box-sizing: border-box !important; z-index: 10 !important; transition: transform 0.2s ease-in-out !important; background-color: #fffdf5 !important; }
+            .lounge-main { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; width: 100vw !important; box-sizing: border-box !important; z-index: 5 !important; background-color: #fffdf5 !important; display: flex !important; flex-direction: column !important; justify-content: flex-start !important; align-items: stretch !important; }
+            
+            body.mobile-chat-view-engaged .lounge-sidebar { transform: translateX(-100%) !important; }
+            body.mobile-chat-view-engaged .lounge-main { z-index: 20 !important; }
+
+            .chat-window-pane { width: 100% !important; height: 100% !important; display: flex !important; flex-direction: column !important; box-sizing: border-box !important; position: relative !important; background-color: #fffdf5 !important; }
+            .chat-log-display { flex: 1 !important; padding: 12px !important; overflow-y: auto !important; box-sizing: border-box !important; }
+            .chat-footer-input-bar { width: 100% !important; padding: 12px !important; box-sizing: border-box !important; background-color: #e6c7c3 !important; display: flex !important; gap: 8px !important; align-items: center !important; position: relative !important; z-index: 30 !important; border-top: 1px solid #aad052 !important; }
+            input[type="text"] { font-size: 16px !important; flex: 1 !important; min-width: 0 !important; background-color: #aad052 !important; border: 1px solid #fffdf5 !important; color: white; }
+            .chat-footer-input-bar .sync-btn { width: 42px !important; height: 42px !important; padding: 0 !important; border-radius: 50% !important; background: #aad052 !important; color: white !important; flex-shrink: 0 !important; margin-right: 5px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+            #mobileSendBtn{ margin-right: 25px !important; background-color: #aad052 !important; }
+        }
+
+        #msgInputField::-webkit-scrollbar { display: none; }
+        #msgInputField { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes softBreathe {
+            0% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-6px) scale(1.02); } 
+            100% { transform: translateY(0px) scale(1); }
+        }
+
+        .alive-logo {
+            animation: softBreathe 3.5s ease-in-out infinite;
+            filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); 
         }
     </style>
+    <link rel="manifest" href="/manifest.json">
 </head>
 <body>
+<div class="app-card" id="loginCard">
+    <img src="dipsum-logo.png" alt="Dipsum Logo" class="alive-logo" style="width: 240px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
+    <h2 id="authTitle">Your Secure Chat Portal</h2>
+    <p style="margin-top: 20px; font-size: 18px; color: #b31e41;" id="authDescription">Pull up a cushion and stay a while. 🧸</p>
 
-    <div id="authCard" class="app-card">
-        <h2 style="color: #7a9c2b; margin-top: 0; margin-bottom: 20px;" id="authTitle">Dipsum Login</h2>
-        <input type="text" id="usernameInput" class="login-field" placeholder="Username">
-        <input type="password" id="passwordInput" class="login-field" placeholder="Password">
-        <button id="primaryAuthBtn" class="action-btn" onclick="executeAuthentication()">Sign In</button>
-        <a id="toggleAuthModeLink" href="#" class="secondary-link" onclick="switchAuthView(event)">Create an account</a>
+    <input type="text" id="usernameInput" placeholder="Enter Username" class="login-field">
+    <input type="password" id="passwordInput" placeholder="Enter Password" class="login-field">
+
+    <button class="sync-btn" id="authBtn" onclick="handleAuthSubmit()">Access Account</button>
+
+    <p style="margin-top: 20px; font-size: 18px; color: #b31e41;">
+        <span id="toggleText">Need an account?</span>
+        <span id="toggleLink" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" onclick="toggleAuthMode()">Create one here</span>
+    </p>
+</div>
+
+<div id="chatLounge" class="lounge-container" style="display: none;">
+    <div class="lounge-sidebar">
+        <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
+            <input type="file" id="userProfilePicUploader" accept="image/*" style="display: none;" onchange="executeOwnProfilePicUpload(this)">
+            <div id="currentUserAvatarWrapper" onclick="document.getElementById('userProfilePicUploader').click();" style="cursor: pointer; position: relative;" title="Click to upload profile picture">
+                <div class="sidebar-dp-avatar" id="myProfileAvatarElement" style="width:70px; height:70px; font-size:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">👤</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
+                <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; width: fit-content; transition: background 0.2s;" onmouseover="this.style.background='#fb9fa3'" onmouseout="this.style.background='#ffc8b0'">🚪 Logout</button>
+            </div>
+        </div>
+
+        <hr style="border-color: #ad3b72; margin: 15px 0;">
+        <h4>Available Directory</h4>
+        <div id="userListContainer"></div>
     </div>
 
-    <div id="appWorkspace" class="dashboard-container hidden-panel">
-        <header class="app-header">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <img id="myDisplayAvatar" class="user-avatar" src="dipsum-logo.png" alt="Me" onclick="triggerProfilePicUpload()">
-                <span id="welcomeLabel">Dashboard</span>
-            </div>
-            <button class="action-btn" style="width: auto; padding: 6px 15px; font-size: 14px; background: #7a9c2b;" onclick="performLogout()">Logout</button>
-        </header>
-        
-        <div class="main-workspace">
-            <aside class="sidebar-panel">
-                <div style="padding: 10px; display: flex; gap: 5px; border-bottom: 1px solid #e2e8f0;">
-                    <input type="text" id="targetSearchUser" class="chat-input" placeholder="Search user..." style="padding: 8px;">
-                    <button class="send-icon-btn" style="padding: 8px 12px;" onclick="dispatchConnectionInvite()">Add</button>
-                </div>
-                <div id="activeUserListBox" class="user-list-box"></div>
-            </aside>
-            
-            <main class="chat-panel">
-                <div id="chatWindowHeader" style="padding: 15px; background: white; border-bottom: 1px solid #e2e8f0; font-weight: bold; display: none;">
-                    Chatting with <span id="currentChatPartnerName">...</span>
-                </div>
-                <div id="chatMessageBody" class="chat-body">
-                    <div style="margin: auto; color: #94a3b8; font-size: 15px;">Select a contact to start conversation</div>
-                </div>
-                <div id="chatInteractionFooter" class="chat-footer" style="display: none;">
-                    <label for="hiddenFileUploader" class="attachment-label">📷</label>
-                    <input type="file" id="hiddenFileUploader" accept="image/*" style="display: none;" onchange="processImageAttachment(event)">
-                    <input type="text" id="typedMessagePayload" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') transmitMessage()">
-                    <button class="send-icon-btn" onclick="transmitMessage()">Send</button>
-                </div>
-            </main>
+    <div class="lounge-main">
+        <div id="chatPlaceholder">
+            <h2>Step into the Dipsum Lounge! 🧸</h2>
+            <p style="font-weight: bolder; font-size: 14px;">Choose a friendly face from the directory to start sharing sweet moments. 💕</p>
         </div>
     </div>
+</div>
 
-    <script>
-        // FIXED: Dynamically matches whatever IP address the browser uses to connect
-        const backendBaseUrl = window.location.origin;
+<div id="inviteModal" class="modal-overlay">
+    <div class="modal-box">
+        <div style="font-size: 35px; margin-bottom: 10px;">✉️</div>
+        <h3 style="margin: 0 0 10px 0;" id="modalTitle">Chat Invitation</h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px;" id="modalMessage">Someone wants to chat with you.</p>
+        <div class="modal-actions">
+            <button class="btn-accept" onclick="submitInviteResponse(true)">Accept</button>
+            <button class="btn-decline" onclick="submitInviteResponse(false)">Decline</button>
+        </div>
+    </div>
+</div>
 
-        let activeSessionUser = null;
-        let activeChatTarget = null;
-        let isRegistrationView = false;
-        let globalPollerId = null;
+<div id="systemAlertModal" class="custom-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fdf8ef; backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 10000;">
+    <div style="background: #fdc348; border: 1px solid #dba93b; padding: 25px; border-radius: 12px; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+        <div style="font-size: 36px; margin-bottom: 10px;" id="sysAlertIcon">⚠️</div>
+        <h3 id="sysAlertTitle" style="margin-bottom: 10px; font-size: 25px; font-weight: 600; color: #7a1029;">System Notification</h3>
+        <p id="sysAlertText" style="color: #b31e41; font-size: 18px; margin-bottom: 20px; line-height: 1.5;"></p>
+        <button class="sync-btn" style="width: 100%;" onclick="dismissCustomSystemAlert()">Acknowledge</button>
+    </div>
+</div>
 
-        function switchAuthView(e) {
-            e.preventDefault();
-            isRegistrationView = !isRegistrationView;
-            document.getElementById("authTitle").innerText = isRegistrationView ? "Register Account" : "Dipsum Login";
-            document.getElementById("primaryAuthBtn").innerText = isRegistrationView ? "Sign Up" : "Sign In";
-            document.getElementById("toggleAuthModeLink").innerText = isRegistrationView ? "Already have an account? Login" : "Create an account";
+<script>
+    // 🌐 ABSOLUTE BACKEND ROUTING: Forces frontend to look at your live Railway server
+    const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
+
+    // 🎵 DUAL NOTIFICATION SOUND ENGINE
+    let totalUnreadMessagesTracked = 0;
+    const backgroundChime = new Audio('tune1.mp3'); // 📥 For background unread badge increases
+    const activeChatChime = new Audio('tune2.mp3'); // 💬 For new messages sliding into the open chat
+
+    let refreshLoop = null;
+    let currentInviteSender = null;
+    let isSignUpMode = false;
+    let activeChatTarget = null; 
+    let currentLoadedMessageCount = 0; 
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedSessionUser = localStorage.getItem('dipsum_logged_user');
+        if (savedSessionUser && savedSessionUser.trim() !== "") {
+            document.getElementById('loginCard').style.display = 'none';
+            document.getElementById('chatLounge').style.display = 'flex';
+            document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
+            startAppSynchronization();
+            setupPushNotifications(savedSessionUser.toLowerCase());
+        }
+    });
+
+    function toggleAuthMode() {
+        isSignUpMode = !isSignUpMode;
+        const authTitle = document.getElementById('authTitle');
+        const authDescription = document.getElementById('authDescription');
+        const authBtn = document.getElementById('authBtn');
+        const toggleText = document.getElementById('toggleText');
+        const toggleLink = document.getElementById('toggleLink');
+
+        if (isSignUpMode) {
+            authTitle.innerText = "Create New Account";
+            authDescription.innerText = "Sign up below to register your enterprise account.";
+            authBtn.innerText = "Register & Join";
+            toggleText.innerText = "Already have an account?";
+            toggleLink.innerText = "Log In here";
+        } else {
+            authTitle.innerText = "Your Secure Chat Portal";
+            authDescription.innerText = "Sign in to access your dashboard lounge.";
+            authBtn.innerText = "Access Account";
+            toggleText.innerText = "Need an account?";
+            toggleLink.innerText = "Create one here";
+        }
+    }
+
+    function handleAuthSubmit() {
+        const username = document.getElementById('usernameInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        const authBtn = document.getElementById('authBtn');
+
+        if (!username || !password) {
+            displaySystemAlert("Missing Information", "Please fill out both the username and password fields to proceed.", "🚫");
+            return;
         }
 
-        function executeAuthentication() {
-            const user = document.getElementById("usernameInput").value.trim();
-            const pass = document.getElementById("passwordInput").value.trim();
-            if(!user || !pass) return alert("Please fill in all layout fields.");
+        const initialBtnText = authBtn.innerText;
+        authBtn.innerText = "Processing...";
 
-            const endpoint = isRegistrationView ? "/api/register" : "/api/login";
-            fetch(`${backendBaseUrl}${endpoint}?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`)
+        let targetUrl = `${backendBaseUrl}/api/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        if (isSignUpMode) {
+            targetUrl = `${backendBaseUrl}/api/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        }
+
+        fetch(targetUrl)
             .then(res => res.text())
             .then(data => {
-                if(data.includes("SUCCESS")) {
-                    activeSessionUser = user.toLowerCase();
-                    initializeSystemWorkspace();
+                authBtn.innerText = initialBtnText;
+                if (data.startsWith("SUCCESS")) {
+                    if (isSignUpMode) {
+                        displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
+                        toggleAuthMode();
+                    } else {
+                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
+                        document.getElementById('loginCard').style.display = 'none';
+                        document.getElementById('chatLounge').style.display = 'flex';
+                        document.getElementById('currentProfileName').innerText = username.toLowerCase();
+                        startAppSynchronization();
+                        setupPushNotifications(username.toLowerCase());
+                    }
                 } else {
-                    alert(data);
+                    displaySystemAlert("Authentication Failure", data, "❌");
                 }
-            }).catch(() => alert("Network context switch error. Check server status."));
-        }
+            })
+            .catch(err => {
+                authBtn.innerText = initialBtnText;
+                displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
+            });
+    }
 
-        function initializeSystemWorkspace() {
-            document.getElementById("authCard").style.display = "none";
-            document.getElementById("appWorkspace").classList.remove("hidden-panel");
-            document.getElementById("welcomeLabel").innerText = activeSessionUser.toUpperCase();
-            
-            fetchUserProfilePicture(activeSessionUser, "myDisplayAvatar");
-            refreshWorkspaceData();
-            globalPollerId = setInterval(refreshWorkspaceData, 3500);
-        }
+    function executeAppLogout() {
+        localStorage.removeItem('dipsum_logged_user');
+        if (refreshLoop) clearInterval(refreshLoop);
+        activeChatTarget = null;
+        currentLoadedMessageCount = 0;
+        window.location.reload();
+    }
 
-        function performLogout() {
-            clearInterval(globalPollerId);
-            activeSessionUser = null;
-            activeChatTarget = null;
-            document.getElementById("appWorkspace").classList.add("hidden-panel");
-            document.getElementById("authCard").style.display = "block";
-        }
+    function startAppSynchronization() {
+        syncCycle();
+        refreshLoop = setInterval(syncCycle, 2000); 
+    }
 
-        function refreshWorkspaceData() {
-            if(!activeSessionUser) return;
-            
-            // Sync user list
-            fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(activeSessionUser)}`)
+    function syncCycle() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
             .then(res => res.text())
-            .then(data => {
-                const box = document.getElementById("activeUserListBox");
-                box.innerHTML = "";
-                if(!data) return;
+            .then(rawText => {
+                const listContainer = document.getElementById('userListContainer');
+                if (!listContainer) return;
+                listContainer.innerHTML = "";
+                if(!rawText || rawText.trim() === "") return;
 
-                const nodes = data.split("$$$");
-                nodes.forEach(node => {
-                    const parts = node.split("###");
-                    if(parts.length < 5) return;
-                    const name = parts[0];
-                    if(name === activeSessionUser) return;
+                let currentCycleUnreadSum = 0; 
 
-                    const isOnline = parts[1] === "true";
-                    const unreads = parseInt(parts[2]);
-                    const connectionStatus = parts[3];
-                    const picPayload = parts[4];
+                rawText.split('$$$').forEach(userToken => {
+                    if (!userToken || userToken.trim() === "") return;
 
-                    const row = document.createElement("div");
-                    row.className = "user-item";
-                    
-                    let avatarImgSrc = "dipsum-logo.png";
-                    if(picPayload && picPayload !== "NONE") {
-                        avatarImgSrc = picPayload;
+                    const parts = userToken.split('###');
+                    if (parts.length < 5) return;
+
+                    const targetUser = parts[0].trim();
+                    const isOnline = parts[1].trim() === "true";
+                    const unreadCount = parseInt(parts[2].trim(), 10);
+                    const relationshipStatus = parts[3].trim();
+                    let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
+                    const cleanName = targetUser.toLowerCase();
+
+                    if (cleanName !== activeChatTarget) {
+                        currentCycleUnreadSum += unreadCount;
+                    }
+
+                    if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
+                        customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
+                    }
+
+                    if(cleanName === user) {
+                        const myAvatarElement = document.getElementById('myProfileAvatarElement');
+                        if (myAvatarElement) {
+                            if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                                myAvatarElement.innerHTML = `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            } else {
+                                myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
+                            }
+                        }
+                        return;
+                    }
+
+                    if (cleanName === activeChatTarget) {
+                        updateHeaderUserStatusIndicator(isOnline);
+                    }
+
+                    const row = document.createElement('div');
+                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
+
+                    row.dataset.avatarData = customAvatarPic;
+                    row.onclick = () => openTargetChatWindow(cleanName);
+
+                    const statusClass = isOnline ? "status-online" : "status-offline";
+                    let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
+
+                    let dpContentHtml = "";
+                    if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
+                        dpContentHtml = `<img src="${customAvatarPic}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; display: block;">`;
+                    } else {
+                        dpContentHtml = `<div class="sidebar-dp-avatar" style="background:#334155; color:#94a3b8; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
+                    }
+
+                    let actionComponentHtml = "";
+                    if (relationshipStatus === "CONNECTED") {
+                        actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
+                    } else if (relationshipStatus === "PENDING") {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
+                    } else {
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
+                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
                     }
 
                     row.innerHTML = `
-                        <img class="user-avatar" src="${avatarImgSrc}">
-                        <div style="text-align: left;">
-                            <div style="font-weight: bold;">${name}</div>
-                            <div style="font-size: 12px; color: ${isOnline ? '#22c55e':'#94a3b8'}">${isOnline ? 'Online':'Offline'}</div>
+                        <div style="display: flex; align-items: center; position: relative;">
+                            <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
+                            ${dpContentHtml}
+                            <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
+                            ${unreadBadgeHtml}
                         </div>
+                        ${actionComponentHtml}
                     `;
-
-                    if(connectionStatus === "CONNECTED") {
-                        if(unreads > 0) {
-                            row.innerHTML += `<span class="badge-count">${unreads}</span>`;
-                        }
-                        row.onclick = () => selectChatTargetChannel(name);
-                    } else if(connectionStatus === "PENDING") {
-                        row.innerHTML += `<span class="badge-count" style="background:#e2e8f0; color:#64748b;">Pending</span>`;
-                    } else {
-                        row.innerHTML += `<button class="send-icon-btn" style="padding:4px 8px; font-size:12px; margin-left:auto;" onclick="dispatchDirectInvite('${name}')">Connect</button>`;
-                    }
-                    box.appendChild(row);
+                    listContainer.appendChild(row);
                 });
+
+                if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
+                    backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
+                }
+                totalUnreadMessagesTracked = currentCycleUnreadSum;
             });
 
-            // Check incoming requests
-            fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(activeSessionUser)}`)
+        if (activeChatTarget) {
+            fetchActiveChatMessages(user, activeChatTarget);
+        }
+
+        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`)
             .then(res => res.text())
-            .then(data => {
-                if(data.startsWith("PENDING:")) {
-                    const sender = data.split(":")[1];
-                    if(confirm(`Accept incoming link connection request from ${sender}?`)) {
-                        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(activeSessionUser)}&action=accept`);
-                    } else {
-                        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(activeSessionUser)}&action=reject`);
+            .then(response => {
+                const modal = document.getElementById('inviteModal');
+                if (response.startsWith("PENDING:")) {
+                    const sender = response.split(":")[1];
+                    if(!modal.classList.contains('active')) {
+                        currentInviteSender = sender;
+                        document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(sender)}</b> wants to start a live chat session with you.`;
+                        modal.classList.add('active');
                     }
                 }
             });
+    }
 
-            if(activeChatTarget) {
-                syncChatMessagesExchange();
-            }
-        }
+    function sendChatInvite(targetUsername) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
-        function dispatchConnectionInvite() {
-            const target = document.getElementById("targetSearchUser").value.trim().toLowerCase();
-            if(!target) return;
-            dispatchDirectInvite(target);
-            document.getElementById("targetSearchUser").value = "";
-        }
-
-        function dispatchDirectInvite(target) {
-            fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(activeSessionUser)}&to=${encodeURIComponent(target)}`)
+        fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(user)}&to=${encodeURIComponent(targetUsername)}`)
             .then(res => res.text())
-            .then(() => alert(`Connection request dispatched to ${target}`));
+            .then(response => {
+                if (response.trim() === "SUCCESS") syncCycle();
+                else alert("Failed to send chat invitation. Please try again.");
+            })
+            .catch(err => console.error("Error dispatching invitation:", err));
+    }
+
+    function submitInviteResponse(isAccepted) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        const action = isAccepted ? "accept" : "decline";
+
+        document.getElementById('inviteModal').classList.remove('active');
+
+        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(user)}&action=${action}`)
+            .then(res => res.text())
+            .then(() => syncCycle());
+    }
+
+    function openTargetChatWindow(targetUsername) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        let activeUserRows = Array.from(document.getElementById('userListContainer').children);
+        let matchedRow = activeUserRows.find(row => row.innerHTML.toLowerCase().includes(targetUsername));
+        let activeChatAvatarPayload = (matchedRow && matchedRow.dataset.avatarData) ? matchedRow.dataset.avatarData : "NONE";
+
+        let isTargetOnline = false;
+        if (matchedRow) {
+            const statusDot = matchedRow.querySelector('.status-dot');
+            if (statusDot && statusDot.classList.contains('status-online')) isTargetOnline = true;
         }
 
-        function selectChatTargetChannel(targetName) {
-            activeChatTarget = targetName;
-            document.getElementById("chatWindowHeader").style.display = "block";
-            document.getElementById("currentChatPartnerName").innerText = targetName.toUpperCase();
-            document.getElementById("chatInteractionFooter").style.display = "flex";
-            syncChatMessagesExchange();
-        }
+        fetch(`${backendBaseUrl}/api/checkConnection?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUsername)}`)
+            .then(res => res.text())
+            .then(isAllowed => {
+                if (isAllowed.trim() === "TRUE") {
 
-        function syncChatMessagesExchange() {
-            if(!activeSessionUser || !activeChatTarget) return;
-            fetch(`${backendBaseUrl}/api/getMessages?from=${encodeURIComponent(activeSessionUser)}&to=${encodeURIComponent(activeChatTarget)}`)
+                    currentLoadedMessageCount = 0;
+                    activeChatTarget = targetUsername;
+
+                    let loungeMain = document.querySelector('.lounge-main');
+                    if (!loungeMain) loungeMain = document.querySelector('div[style*="flex: 1"]') || document.querySelector('div[style*="flex:1"]');
+                    if (!loungeMain) return;
+
+                    let headerAvatarHtml = "";
+                    if(activeChatAvatarPayload !== "NONE" && activeChatAvatarPayload.trim() !== "" && !activeChatAvatarPayload.includes("broken")) {
+                        headerAvatarHtml = `<img src="${activeChatAvatarPayload}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:12px;">`;
+                    } else {
+                        headerAvatarHtml = `<div class="header-dp-avatar" style="margin-right:12px; background:#2563eb; color:white; font-weight:bold; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">${targetUsername.charAt(0).toUpperCase()}</div>`;
+                    }
+
+                    const initialStatusIconHtml = isTargetOnline
+                        ? `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`
+                        : `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+
+                    loungeMain.innerHTML = `
+                <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                    <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
+
+                        <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
+
+                        ${headerAvatarHtml}
+
+                        <div class="header-meta-box">
+                            <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px; line-height: 1.2;">${capitalizeFirstLetter(targetUsername)}</div>
+
+                            <div id="userStatusWrapper" class="status-round-container">
+                                ${initialStatusIconHtml}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background:#baa2a0;"></div>
+
+                    <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
+                        <span onclick="injectEmojiToken('😀')">😀</span>
+                        <span onclick="injectEmojiToken('👍')">👍</span>
+                        <span onclick="injectEmojiToken('❤️')">❤️</span>
+                        <span onclick="injectEmojiToken('🥰')">🥰</span>
+                        <span onclick="injectEmojiToken('🌹')">🌹</span>
+                        <span onclick="injectEmojiToken('💖')">💖</span>
+                        <span onclick="injectEmojiToken('😘')">😘</span>
+                    </div>
+
+                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
+
+                        <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
+
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
+
+                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
+
+                        <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
+
+                    </div>
+                </div>
+            `;
+
+                    if(window.innerWidth <= 768) {
+                        const backBtn = loungeMain.querySelector('.mobile-back-nav-btn');
+                        if(backBtn) backBtn.style.setProperty('display', 'block', 'important');
+                    }
+
+                    document.body.classList.add('mobile-chat-view-engaged');
+
+                    const activeChatLog = document.getElementById('chatLogDisplay');
+                    if (activeChatLog) {
+                        const keyboardResizeObserver = new ResizeObserver(() => {
+                            activeChatLog.scrollTop = activeChatLog.scrollHeight;
+                        });
+                        keyboardResizeObserver.observe(activeChatLog);
+                    }
+
+                    fetchActiveChatMessages(user, targetUsername);
+                } else {
+                    displaySystemAlert("Security Access Violation", `You do not have an active secure transmission channel.`, "🔒");
+                }
+            })
+            .catch(err => console.error("Error executing security header gateway sync:", err));
+    }   
+    
+    function fetchActiveChatMessages(currentUser, targetUser) {
+        fetch(`${backendBaseUrl}/api/getMessages?from=${encodeURIComponent(currentUser)}&to=${encodeURIComponent(targetUser)}`)
             .then(res => res.text())
             .then(data => {
-                const viewer = document.getElementById("chatMessageBody");
-                viewer.innerHTML = "";
-                if(!data.trim()) {
-                    viewer.innerHTML = `<div style="margin: auto; color: #94a3b8; font-size: 14px;">Secure connection active. Say Hello!</div>`;
+                const logBox = document.getElementById('chatLogDisplay');
+                if(!logBox) return;
+
+                if(!data || data.trim() === "") {
+                    logBox.innerHTML = "";
+                    currentLoadedMessageCount = 0;
                     return;
                 }
 
-                const lines = data.split("\n");
-                lines.forEach(line => {
-                    if(!line.includes(":")) return;
-                    const splitIdx = line.indexOf(":");
-                    const sender = line.substring(0, splitIdx);
-                    const body = line.substring(splitIdx + 1);
+                const incomingMessageTokens = data.split('\n');
 
-                    const bubble = document.createElement("div");
-                    bubble.className = `msg-bubble ${sender === activeSessionUser ? 'sent' : 'received'}`;
+                if (currentLoadedMessageCount === 0) {
+                    logBox.innerHTML = "";
+                } else if (incomingMessageTokens.length === currentLoadedMessageCount) {
+                    return;
+                }
 
-                    if(body.startsWith("IMG_ATTACHMENT_DATA:")) {
-                        const base64Data = body.replace("IMG_ATTACHMENT_DATA:", "");
-                        bubble.innerHTML = `<img src="${base64Data}" style="max-width: 100%; border-radius: 8px; display: block; max-height: 200px; object-fit: contain;">`;
+                const isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
+                const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
+                
+                let hasFreshIncomingMessage = false;
+
+                newPacketsToAppend.forEach(msgToken => {
+                    const separatorIndex = msgToken.indexOf(':');
+                    if (separatorIndex === -1) return;
+
+                    const sender = msgToken.substring(0, separatorIndex);
+                    let text = msgToken.substring(separatorIndex + 1);
+
+                    if (sender !== currentUser) hasFreshIncomingMessage = true;
+
+                    const bubble = document.createElement('div');
+                    bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
+
+                    if (text.startsWith("IMG_ATTACHMENT_DATA:")) {
+                        let rawBase64Source = text.replace("IMG_ATTACHMENT_DATA:", "");
+                        if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) {
+                            rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
+                        }
+                        bubble.innerHTML = `<img src="${rawBase64Source}" class="msg-bubble-media" onclick="window.open('${rawBase64Source}', '_blank')">`;
+                        bubble.style.background = "transparent";
+                        bubble.style.padding = "0";
                     } else {
-                        bubble.innerText = body;
+                        bubble.innerText = text;
                     }
-                    viewer.appendChild(bubble);
+                    logBox.appendChild(bubble);
                 });
-                viewer.scrollTop = viewer.scrollHeight;
-            });
+
+                if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) {
+                    activeChatChime.play().catch(e => console.log("Audio autoplay prevented."));
+                }
+
+                currentLoadedMessageCount = incomingMessageTokens.length;
+
+                if (isScrolledToBottom || currentLoadedMessageCount === incomingMessageTokens.length) {
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            })
+            .catch(err => console.error("Error synchronizing active conversation state:", err));
+    }
+
+    function toggleEmojiDrawerOverlay() {
+        const drawer = document.getElementById('emojiMiniDrawer');
+        if(!drawer) return;
+        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
+    }
+
+    function injectEmojiToken(emojiChar) {
+        const inputField = document.getElementById('msgInputField');
+        if(inputField) {
+            inputField.value += emojiChar;
+            inputField.focus();
         }
+        document.getElementById('emojiMiniDrawer').style.display = 'none';
+    }
 
-        function transmitMessage() {
-            const input = document.getElementById("typedMessagePayload");
-            const txt = input.value.trim();
-            if(!txt || !activeChatTarget) return;
+    function processMediaFileTransmission(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const targetsSelectedFile = fileInput.files[0];
 
-            fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(activeSessionUser)}&to=${encodeURIComponent(activeChatTarget)}`, {
-                method: 'POST',
-                body: txt
-            }).then(() => {
-                input.value = "";
-                syncChatMessagesExchange();
-            });
-        }
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
 
-        function processImageAttachment(event) {
-            const file = event.target.files[0];
-            if (!file || !activeChatTarget) return;
+                const maxW = 400; const maxH = 400;
+                let w = img.width; let h = img.height;
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const base64Payload = e.target.result;
-                fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(activeSessionUser)}&to=${encodeURIComponent(activeChatTarget)}`, {
+                if (w > h) { if (w > maxW) { h *= maxW / w; w = maxW; } } 
+                else { if (h > maxH) { w *= maxH / h; h = maxH; } }
+
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+
+                const compressedBase64DataString = canvas.toDataURL('image/jpeg', 0.6);
+                const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+                const encodedPayloadString = "IMG_ATTACHMENT_DATA:" + compressedBase64DataString;
+
+                fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
                     method: 'POST',
-                    body: "IMG_ATTACHMENT_DATA:" + base64Payload
-                }).then(() => {
-                    syncChatMessagesExchange();
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: encodedPayloadString
+                }).then(res => res.text()).then(() => {
+                        fileInput.value = "";
+                        fetchActiveChatMessages(user, activeChatTarget);
                 });
             };
-            reader.readAsDataURL(file);
-        }
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(targetsSelectedFile);
+    }
 
-        function triggerProfilePicUpload() {
-            const fileInput = document.createElement("input");
-            fileInput.type = "file";
-            fileInput.accept = "image/*";
-            fileInput.onchange = function(e) {
-                const file = e.target.files[0];
-                if(!file) return;
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    const imgBase64 = evt.target.result;
-                    fetch(`${backendBaseUrl}/api/uploadProfilePic?user=${encodeURIComponent(activeSessionUser)}`, {
-                        method: 'POST',
-                        body: imgBase64
-                    })
-                    .then(res => res.text())
-                    .then(() => {
-                        document.getElementById("myDisplayAvatar").src = imgBase64;
-                    });
-                };
-                reader.readAsDataURL(file);
-            };
-            fileInput.click();
+    function handleChatKeyDown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            triggerMessageDispatch();
         }
+    }
 
-        function fetchUserProfilePicture(username, imgElementId) {
-            fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(username)}`)
-            .then(res => res.text())
-            .then(data => {
-                if(!data) return;
-                const nodes = data.split("$$$");
-                nodes.forEach(node => {
-                    const parts = node.split("###");
-                    if(parts[0] === username && parts[4] && parts[4] !== "NONE") {
-                        document.getElementById(imgElementId).src = parts[4];
-                    }
+    function triggerMessageDispatch() {
+        const inputField = document.getElementById('msgInputField');
+        if(!inputField) return;
+
+        let messageContent = inputField.value.trim();
+        if(!messageContent || !activeChatTarget) return;
+
+        messageContent = messageContent.replace(/\n/g, "<br>");
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        inputField.value = "";
+        inputField.style.height = "45px";
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: messageContent
+        }).then(res => res.text()).then(() => {
+                fetchActiveChatMessages(user, activeChatTarget);
+        });
+    }
+
+    function displaySystemAlert(title, message, icon = "⚠️") {
+        document.getElementById('sysAlertIcon').innerText = icon;
+        document.getElementById('sysAlertTitle').innerText = title;
+        document.getElementById('sysAlertText').innerText = message;
+        document.getElementById('systemAlertModal').style.display = 'flex';
+    }
+
+    function dismissCustomSystemAlert() {
+        document.getElementById('systemAlertModal').style.display = 'none';
+
+        // If a broken auto-session caused the crash, force return to the login panel
+        if (document.getElementById('chatLounge').style.display !== 'flex') {
+            localStorage.removeItem('dipsum_logged_user');
+            document.getElementById('loginCard').style.display = 'block';
+            const authBtn = document.getElementById('authBtn');
+            if (authBtn) authBtn.innerText = "Access Account";
+        }
+    }
+    function capitalizeFirstLetter(string) {
+        if (!string) return "";
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    function executeOwnProfilePicUpload(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const targetFile = fileInput.files[0];
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const targetSize = 300;
+                canvas.width = targetSize; canvas.height = targetSize;
+
+                let srcX = 0; let srcY = 0;
+                let srcSize = Math.min(img.width, img.height);
+
+                if (img.width > img.height) srcX = (img.width - img.height) / 2;
+                else srcY = (img.height - img.width) / 2;
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, targetSize, targetSize);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.92);
+                const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+                fetch(`${backendBaseUrl}/api/uploadProfilePic?user=${encodeURIComponent(user)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: compressedBase64
+                }).then(res => res.text()).then(status => {
+                        if(status === "UPLOAD_SUCCESSFUL") {
+                            document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            syncCycle();
+                        }
                 });
-            });
-        }
-    </script>
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(targetFile);
+    }
 
-    <script>
-      // Clean Service Worker registration (Asset cache layer only, no push modules)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('Asset Service Worker running smoothly.', reg.scope))
-          .catch(err => console.error('Worker assignment failed:', err));
-      }
-    </script>
+    function exitActiveMobileChatView() {
+        activeChatTarget = null;
+        currentLoadedMessageCount = 0;
+        document.body.classList.remove('mobile-chat-view-engaged');
+    }
+
+    function updateHeaderUserStatusIndicator(isOnline) {
+        const wrapper = document.getElementById('userStatusWrapper');
+        if (!wrapper) return;
+        if (isOnline) wrapper.innerHTML = `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`;
+        else wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+    }
+
+    // =========================================================================
+    // 🔔 NATIVE SYSTEM PUSH NOTIFICATION SUBSCRIPTION ENGINE
+    // =========================================================================
+
+    function setupPushNotifications(username) {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            console.log("Native Push Notifications are not supported by this browser client.");
+            return;
+        }
+
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('OS Notification layer permission cleared successfully!');
+                
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.pushManager.getSubscription().then(subscription => {
+                        if (subscription) {
+                            sendSubscriptionToServer(subscription, username);
+                            return subscription;
+                        }
+
+                        // 🚨 PASTE YOUR GENERATED PUBLIC KEY HERE:
+                        const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
+                        const convertedApplicationKey = urlBase64ToUint8Array(publicVapidKey);
+
+                        return registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: convertedApplicationKey
+                        }).then(newSubscription => {
+                            sendSubscriptionToServer(newSubscription, username);
+                        });
+                    }).catch(err => console.error("Could not register browser push properties:", err));
+                });
+            } else {
+                console.warn('System push notifications blocked by user device preferences.');
+            }
+        });
+    }
+
+    function sendSubscriptionToServer(subscription, username) {
+        fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+        }).then(res => res.text()).then(statusText => console.log("System Push Registration Sync status:", statusText))
+          .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker successfully registered!', reg))
+        .catch(err => console.error('Service worker registration failed:', err));
+    });
+  }
+</script>
 </body>
 </html>
