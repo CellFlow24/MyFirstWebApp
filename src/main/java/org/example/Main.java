@@ -201,7 +201,7 @@ public class Main {
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
 
-            // ✅ FIXED: Send push in background thread - never blocks the request
+            // Send push in background thread
             String recipientSubJson = userSubscriptions.get(cleanTo);
             if (recipientSubJson != null && pushService != null) {
                 final String subJsonFinal = recipientSubJson;
@@ -227,12 +227,11 @@ public class Main {
                             sub.keys.p256dh,
                             sub.keys.auth,
                             payload.getBytes("UTF-8"),
-                            86400  // ✅ TTL = 24 hours - FCM will retry for 24hrs if phone is asleep
+                            86400  // TTL = 24 hours
                         );
                         HttpResponse response = pushService.send(notification);
                         int statusCode = response.getStatusLine().getStatusCode();
 
-                        // Clean up expired/invalid subscriptions
                         if (statusCode == 410 || statusCode == 404) {
                             userSubscriptions.remove(toFinal);
                             deleteSubscriptionFromDatabase(toFinal);
@@ -311,14 +310,16 @@ public class Main {
             ctx.result(String.join("\n", messages));
         });
 
-        // TO THIS:
-        String port = System.getenv("PORT");
-        int portNumber = (port != null) ? Integer.parseInt(port) : 7070;
+        // ==========================================
+        // FIXED SERVER STARTUP LOGIC
+        // ==========================================
+        String portEnv = System.getenv("PORT");
+        int portNumber = (portEnv != null) ? Integer.parseInt(portEnv) : 7070;
 
-        // Just pass the portNumber! 
-        // Javalin automatically defaults to "0.0.0.0" (all network interfaces) under the hood.
+        // Modern Javalin versions automatically bind to 0.0.0.0 when passing just the port.
         app.start(portNumber);
-        System.out.println("✅ Server started and listening on all interfaces at port " + portNumber);
+        System.out.println("✅ Server fully initialized on port " + portNumber);
+    }
 
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -390,7 +391,6 @@ public class Main {
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    // ✅ NEW: Cleans up dead subscriptions automatically
     private static void deleteSubscriptionFromDatabase(String u) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) {
