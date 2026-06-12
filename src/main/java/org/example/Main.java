@@ -8,21 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import nl.martijndwars.webpush.Notification;
-import nl.martijndwars.webpush.PushService;
-import nl.martijndwars.webpush.Subscription;
-import com.google.gson.Gson;
-import java.security.Security;
-import org.apache.http.HttpResponse;
-
 public class Main {
 
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
-    public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
-
     private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
-    private static PushService pushService;
 
     public static void main(String[] args) {
         HashMap<String, String> userDatabase = new HashMap<>();
@@ -32,18 +21,6 @@ public class Main {
         HashMap<String, Integer> unreadCounts = new HashMap<>();
         HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
 
-        Security.addProvider(new BouncyCastleProvider());
-        try {
-            pushService = new PushService();
-            pushService.setSubject("mailto:cellflow24@gmail.com");
-            pushService.setPublicKey("BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI");
-            pushService.setPrivateKey("a7WkNnBOk0meXEkN-R8doC0rKuk70omQvaEkt-OOiZs");
-            System.out.println("✅ Push Service initialized successfully");
-        } catch (Exception e) {
-            System.err.println("Critical Error starting Push Service: " + e.getMessage());
-            e.printStackTrace();
-        }
-
         initializeDatabase(userDatabase, establishedConnections, chatHistories);
 
         Javalin app = Javalin.create(config -> {
@@ -51,19 +28,6 @@ public class Main {
         });
 
         app.get("/", ctx -> ctx.redirect("/index.html"));
-
-        app.post("/api/saveSubscription", ctx -> {
-            String username = ctx.queryParam("username");
-            String subJson = ctx.body();
-            if (username != null && !subJson.isEmpty()) {
-                String cleanUser = username.trim().toLowerCase();
-                userSubscriptions.put(cleanUser, subJson);
-                saveSubscriptionToDatabase(cleanUser, subJson);
-                ctx.result("SUBSCRIPTION_SAVED");
-            } else {
-                ctx.status(400).result("FAIL");
-            }
-        });
 
         app.get("/api/login", ctx -> {
             String user = ctx.queryParam("username");
@@ -201,49 +165,6 @@ public class Main {
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
 
-            // Send push in background thread
-            String recipientSubJson = userSubscriptions.get(cleanTo);
-            if (recipientSubJson != null && pushService != null) {
-                final String subJsonFinal = recipientSubJson;
-                final String fromFinal = cleanFrom;
-                final String toFinal = cleanTo;
-                final String msgFinal = messageBody;
-
-                new Thread(() -> {
-                    try {
-                        Subscription sub = new Gson().fromJson(subJsonFinal, Subscription.class);
-
-                        String snippet = msgFinal.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Sent an image" : msgFinal;
-                        if (snippet.length() > 60) snippet = snippet.substring(0, 60) + "...";
-
-                        String payload = String.format(
-                            "{\"title\":\"💬 %s\", \"body\":\"%s\", \"url\":\"/\"}",
-                            capitalizeFirstLetter(fromFinal),
-                            snippet.replace("\"", "'")
-                        );
-
-                        Notification notification = new Notification(
-                            sub.endpoint,
-                            sub.keys.p256dh,
-                            sub.keys.auth,
-                            payload.getBytes("UTF-8"),
-                            86400  // TTL = 24 hours
-                        );
-                        HttpResponse response = pushService.send(notification);
-                        int statusCode = response.getStatusLine().getStatusCode();
-
-                        if (statusCode == 410 || statusCode == 404) {
-                            userSubscriptions.remove(toFinal);
-                            deleteSubscriptionFromDatabase(toFinal);
-                            System.out.println("Cleaned expired subscription for: " + toFinal);
-                        }
-
-                    } catch (Exception e) {
-                        System.err.println("Push thread error for " + toFinal + ": " + e.getMessage());
-                    }
-                }).start();
-            }
-
             ctx.result("MESSAGE_DISPATCHED_SUCCESSFULLY");
         });
 
@@ -310,15 +231,12 @@ public class Main {
             ctx.result(String.join("\n", messages));
         });
 
-        // ==========================================
-        // FIXED SERVER STARTUP LOGIC
-        // ==========================================
         String portEnv = System.getenv("PORT");
         int portNumber = (portEnv != null) ? Integer.parseInt(portEnv) : 7070;
 
-        // Modern Javalin versions automatically bind to 0.0.0.0 when passing just the port.
-        app.start(portNumber);
-        System.out.println("✅ Server fully initialized on port " + portNumber);
+        // CRITICAL FIX: Forces Javalin to bind to 0.0.0.0 (all IPs, any network switch)
+        app.start("0.0.0.0", portNumber);
+        System.out.println("✅ Server permanently listening on all interfaces at port " + portNumber);
     }
 
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
@@ -328,7 +246,6 @@ public class Main {
             stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT, PRIMARY KEY (user1, user2));");
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
-            stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT);");
 
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
 
@@ -349,9 +266,6 @@ public class Main {
 
             ResultSet rsPics = stmt.executeQuery("SELECT username, payload FROM profile_pics;");
             while (rsPics.next()) userProfilePics.put(rsPics.getString("username"), rsPics.getString("payload"));
-
-            ResultSet rsSub = stmt.executeQuery("SELECT username, sub_json FROM subscriptions;");
-            while (rsSub.next()) userSubscriptions.put(rsSub.getString("username"), rsSub.getString("sub_json"));
 
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
@@ -382,25 +296,5 @@ public class Main {
              PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO profile_pics VALUES (?, ?)")) {
             ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
-    }
-
-    private static void saveSubscriptionToDatabase(String u, String s) {
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO subscriptions VALUES (?, ?)")) {
-            ps.setString(1, u); ps.setString(2, s); ps.executeUpdate();
-        } catch (SQLException e) { System.err.println(e.getMessage()); }
-    }
-
-    private static void deleteSubscriptionFromDatabase(String u) {
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) {
-            ps.setString(1, u);
-            ps.executeUpdate();
-        } catch (SQLException e) { System.err.println(e.getMessage()); }
-    }
-
-    private static String capitalizeFirstLetter(String str) {
-        if (str == null || str.isEmpty()) return str;
-        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 }
