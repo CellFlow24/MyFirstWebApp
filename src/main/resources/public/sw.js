@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dipsum-v5';
+const CACHE_NAME = 'dipsum-v6';
 const ASSETS = [
   '/index.html',
   '/dipsum-logo.png',
@@ -7,12 +7,12 @@ const ASSETS = [
 ];
 
 // Force fetch directly from the network during installation
-self.addEventListener('install', event => {
+self.addEventListener('install', function(event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
+    caches.open(CACHE_NAME).then(function(cache) {
       return Promise.all(
-        ASSETS.map(url => {
-          return fetch(new Request(url, { cache: 'reload' })).then(response => {
+        ASSETS.map(function(url) {
+          return fetch(new Request(url, { cache: 'reload' })).then(function(response) {
             if (!response.ok) throw new Error(`Request failed for ${url}`);
             return cache.put(url, response);
           });
@@ -23,22 +23,32 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', event => {
+// Clean up old caches (like v5) when v6 activates
+self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(function(k) { return k !== CACHE_NAME; }).map(function(k) { 
+            return caches.delete(k); 
+        })
+      );
+    })
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', event => {
+// Network-first fetch strategy (Bypasses API calls entirely)
+self.addEventListener('fetch', function(event) {
+  // 1. NEVER intercept API calls. Let the frontend handle connection issues.
   if (event.request.url.includes('/api/')) return;
+  
+  // 2. Only cache GET requests.
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request).then(cachedResponse => {
+    fetch(event.request).catch(function() {
+      // Pure Promise chain to prevent IDE syntax errors
+      return caches.match(event.request).then(function(cachedResponse) {
         return cachedResponse || new Response('Offline', { status: 503 });
       });
     })
@@ -46,21 +56,21 @@ self.addEventListener('fetch', event => {
 });
 
 // Listen for connectivity changes
-self.addEventListener('message', (event) => {
+self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// FIXED: Removed the async/await execution wrapper to satisfy the IDE validator
-self.addEventListener('push', event => {
-  let title = 'Dipsum';
-  let body = 'You have a new message';
-  let url = '/';
+// Pure ES5/ES6 syntax for Push Notifications (No async/await wrapper to clear IDE errors)
+self.addEventListener('push', function(event) {
+  var title = 'Dipsum';
+  var body = 'You have a new message';
+  var url = '/';
 
   if (event.data) {
     try {
-      const data = event.data.json();
+      var data = event.data.json();
       title = data.title || title;
       body = data.body || body;
       url = data.url || url;
@@ -69,28 +79,29 @@ self.addEventListener('push', event => {
     }
   }
 
-  // Force show - showNotification returns a Promise chain naturally
-  const promise = self.registration.showNotification(title, {
-    body: body,
-    icon: '/dipsum-logo.png',
-    badge: '/dipsum-logo.png',
-    vibrate: [300, 100, 300, 100, 300],
-    requireInteraction: true,
-    tag: 'dipsum-msg-' + Date.now(), // Unique tag = every message shows separately
-    renotify: true,
-    silent: false,
-    data: { url: url }
-  });
-
-  // CRITICAL: Keeps the service worker alive until the notification displays
-  event.waitUntil(promise);
+  // Passing the notification directly into waitUntil guarantees the IDE understands the Promise chain
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body,
+      icon: '/dipsum-logo.png',
+      badge: '/dipsum-logo.png',
+      vibrate: [300, 100, 300, 100, 300],
+      requireInteraction: true,
+      tag: 'dipsum-msg-' + Date.now(), // Unique tag = every message shows separately
+      renotify: true,
+      silent: false,
+      data: { url: url }
+    })
+  );
 });
 
-self.addEventListener('notificationclick', event => {
+// Handle user clicking on the notification
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const client of list) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+      for (var i = 0; i < list.length; i++) {
+        var client = list[i];
         if (client.url.includes('/') && 'focus' in client) return client.focus();
       }
       return clients.openWindow('/');
