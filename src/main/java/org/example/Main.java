@@ -13,7 +13,7 @@ public class Main {
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
     private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
 
-    public static void main(String[] args) {
+public static void main(String[] args) {
         HashMap<String, String> userDatabase = new HashMap<>();
         HashMap<String, Long> userLastSeen = new HashMap<>();
         HashMap<String, String> activeInvites = new HashMap<>();
@@ -29,10 +29,18 @@ public class Main {
 
         app.get("/", ctx -> ctx.redirect("/index.html"));
 
+        // --- UPDATED LOGIN ENDPOINT ---
         app.get("/api/login", ctx -> {
-            String user = ctx.queryParam("username");
-            String pass = ctx.queryParam("password");
-            if (user != null) user = user.trim().toLowerCase();
+            // Flexible matching: supports both 'username' and 'user' parameter keys
+            String user = ctx.queryParam("username") != null ? ctx.queryParam("username") : ctx.queryParam("user");
+            String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
+
+            if (user == null || pass == null || user.trim().isEmpty()) {
+                ctx.result("FAIL: Missing login parameters.");
+                return;
+            }
+
+            user = user.trim().toLowerCase();
 
             if (userDatabase.containsKey(user) && userDatabase.get(user).equals(pass)) {
                 userLastSeen.put(user, System.currentTimeMillis());
@@ -42,10 +50,18 @@ public class Main {
             }
         });
 
+        // --- UPDATED REGISTER ENDPOINT ---
         app.get("/api/register", ctx -> {
-            String user = ctx.queryParam("username");
-            String pass = ctx.queryParam("password");
-            if (user != null) user = user.trim().toLowerCase();
+            // Flexible matching: supports both 'username' and 'user' parameter keys
+            String user = ctx.queryParam("username") != null ? ctx.queryParam("username") : ctx.queryParam("user");
+            String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
+
+            if (user == null || pass == null || user.trim().isEmpty() || pass.trim().isEmpty()) {
+                ctx.result("FAIL: Username and password cannot be empty!");
+                return;
+            }
+
+            user = user.trim().toLowerCase();
 
             if (userDatabase.containsKey(user)) {
                 ctx.result("FAIL: Username already exists!");
@@ -53,7 +69,7 @@ public class Main {
                 userDatabase.put(user, pass);
                 saveUserToDatabase(user, pass);
 
-                if (user != null && !user.equals("help")) {
+                if (!user.equals("help")) {
                     establishedConnections.add(user + ":help");
                     establishedConnections.add("help:" + user);
                     saveConnectionToDatabase(user, "help");
