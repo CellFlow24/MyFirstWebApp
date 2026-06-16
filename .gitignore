@@ -1,29 +1,19 @@
 # Target build directory (compiled Java code)
 target/
 
-# Local SQLite Database files
+# Local SQLite Database files (Catches all DBs, plus your specific path)
 *.db
 *.db-journal
+src/main/resources/chatlounge.db
 
-# IntelliJ IDEA IDE files
+# IDE files
 .idea/
 *.iml
-
-# Eclipse IDE files
 .classpath
 .project
 .settings/
 
-# NetBeans IDE files
-nbproject/
-build/
-nbbuild/
-dist/
-nb-configuration.xml
-
-# Log files
+# Log & OS files
 *.log
-
-# OS-specific system files
 .DS_Store
 Thumbs.db
