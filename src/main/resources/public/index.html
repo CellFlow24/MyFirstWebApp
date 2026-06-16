@@ -269,14 +269,8 @@
     let currentLoadedMessageCount = 0; 
 
     window.addEventListener('DOMContentLoaded', () => {
-        const savedSessionUser = localStorage.getItem('dipsum_logged_user');
-        if (savedSessionUser && savedSessionUser.trim() !== "") {
-            document.getElementById('loginCard').style.display = 'none';
-            document.getElementById('chatLounge').style.display = 'flex';
-            document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
-            startAppSynchronization();
-            setupPushNotifications(savedSessionUser.toLowerCase());
-        }
+        // Auto-login bypassed. 
+        // The user will always see the login card when opening the app.
     });
 
     function toggleAuthMode() {
@@ -303,38 +297,42 @@
     }
 
     function handleAuthSubmit() {
-        const username = document.getElementById('usernameInput').value.trim();
-        const password = document.getElementById('passwordInput').value.trim();
+        const username = document.getElementById('usernameInput').value;
+        const password = document.getElementById('passwordInput').value;
         const authBtn = document.getElementById('authBtn');
+        const initialBtnText = authBtn.innerText;
 
         if (!username || !password) {
-            displaySystemAlert("Missing Information", "Please fill out both the username and password fields to proceed.", "🚫");
+            displaySystemAlert("Input Required", "Please enter both username and password fields.", "⚠️");
             return;
         }
 
-        const initialBtnText = authBtn.innerText;
-        authBtn.innerText = "Processing...";
-
-        let targetUrl = `${backendBaseUrl}/api/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-        if (isSignUpMode) {
-            targetUrl = `${backendBaseUrl}/api/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-        }
+        authBtn.innerText = isSignUpMode ? "Registering..." : "Authenticating...";
+        const endpoint = isSignUpMode ? "/api/register" : "/api/login";
+    
+        // Explicitly fallback to relative routes if backendBaseUrl is empty
+        const base = (typeof backendBaseUrl !== 'undefined' && backendBaseUrl) ? backendBaseUrl : "";
+        const targetUrl = `${base}${endpoint}?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
 
         fetch(targetUrl)
             .then(res => res.text())
             .then(data => {
                 authBtn.innerText = initialBtnText;
-                if (data.startsWith("SUCCESS")) {
+                if (data.includes("SUCCESS")) {
                     if (isSignUpMode) {
                         displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
                         toggleAuthMode();
                     } else {
-                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
+                        // SESSION STORAGE PERSISTENCE REMOVED: Auto-login bypassed here 
                         document.getElementById('loginCard').style.display = 'none';
                         document.getElementById('chatLounge').style.display = 'flex';
                         document.getElementById('currentProfileName').innerText = username.toLowerCase();
+                    
+                        // Fire core application worker streams
                         startAppSynchronization();
-                        setupPushNotifications(username.toLowerCase());
+                        if (typeof setupPushNotifications === 'function') {
+                            setupPushNotifications(username.toLowerCase());
+                        }
                     }
                 } else {
                     displaySystemAlert("Authentication Failure", data, "❌");
@@ -342,18 +340,29 @@
             })
             .catch(err => {
                 authBtn.innerText = initialBtnText;
-                displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
+                console.error(err);
+                displaySystemAlert("Network Error", "Failed to contact the backend infrastructure server.", "📡");
             });
     }
 
     function executeAppLogout() {
-        localStorage.removeItem('dipsum_logged_user');
+        // 1. Stop background syncing
         if (refreshLoop) clearInterval(refreshLoop);
         activeChatTarget = null;
         currentLoadedMessageCount = 0;
-        window.location.reload();
+        
+        // 2. Hide the lounge and show the login card
+        document.getElementById('chatLounge').style.display = 'none';
+        document.getElementById('loginCard').style.display = 'block';
+        
+        // 3. Clear the input fields for the next login
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        
+        // 4. Ensure mobile view is reset
+        document.body.classList.remove('mobile-chat-view-engaged');
     }
-
+    
     function startAppSynchronization() {
         syncCycle();
         refreshLoop = setInterval(syncCycle, 2000); 
