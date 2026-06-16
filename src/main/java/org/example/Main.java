@@ -13,27 +13,41 @@ public class Main {
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
     private static final String DB_URL = "jdbc:sqlite:/app/data/chatlounge.db";
 
-    public static void main(String[] args) {
-        HashMap<String, String> userDatabase = new HashMap<>();
-        HashMap<String, Long> userLastSeen = new HashMap<>();
-        HashMap<String, String> activeInvites = new HashMap<>();
-        HashSet<String> establishedConnections = new HashSet<>();
-        HashMap<String, Integer> unreadCounts = new HashMap<>();
-        HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
+    // Global memory states to support frontend endpoints
+    public static ConcurrentHashMap<String, String> userDatabase = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, Long> userLastSeen = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, String> activeInvites = new ConcurrentHashMap<>();
+    public static HashSet<String> establishedConnections = new HashSet<>();
+    public static ConcurrentHashMap<String, ArrayList<String>> chatHistories = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, String> pushSubscriptions = new ConcurrentHashMap<>();
 
-        initializeDatabase(userDatabase, establishedConnections, chatHistories);
+    public static void main(String[] args) {
+        HashMap<String, String> localUsers = new HashMap<>();
+        HashSet<String> localConns = new HashSet<>();
+        HashMap<String, ArrayList<String>> localChats = new HashMap<>();
+
+        initializeDatabase(localUsers, localConns, localChats);
+
+        // Populate concurrent memory maps
+        localUsers.forEach(userDatabase::put);
+        establishedConnections.addAll(localConns);
+        localChats.forEach(chatHistories::put);
 
         Javalin app = Javalin.create(config -> {
             config.staticFiles.add("/public", Location.CLASSPATH);
+            config.plugins.enableCors(cors -> {
+                cors.add(it -> {
+                    it.anyHost();
+                });
+            });
         });
 
         app.get("/", ctx -> ctx.redirect("/index.html"));
 
-        // --- API LOGIN ENDPOINT (Supports both parameter styles) ---
+        // --- API LOGIN ENDPOINT ---
         app.get("/api/login", ctx -> {
             String user = ctx.queryParam("username") != null ? ctx.queryParam("username") : ctx.queryParam("user");
             String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
-            
             if (user != null) user = user.trim().toLowerCase();
 
             if (user != null && userDatabase.containsKey(user) && userDatabase.get(user).equals(pass)) {
@@ -44,11 +58,10 @@ public class Main {
             }
         });
 
-        // --- API REGISTER ENDPOINT (Supports both parameter styles) ---
+        // --- API REGISTER ENDPOINT ---
         app.get("/api/register", ctx -> {
             String user = ctx.queryParam("username") != null ? ctx.queryParam("username") : ctx.queryParam("user");
             String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
-            
             if (user != null) user = user.trim().toLowerCase();
 
             if (user == null || pass == null || user.trim().isEmpty() || pass.trim().isEmpty()) {
@@ -62,22 +75,176 @@ public class Main {
                 userDatabase.put(user, pass);
                 saveUserToDatabase(user, pass);
 
+                // Default auto-connect to help service desk
                 if (!user.equals("help")) {
-                    establishedConnections.add(user + ":help");
-                    establishedConnections.add("help:" + user);
+                    String[] arr = {user, "help"}; java.util.Arrays.sort(arr);
+                    establishedConnections.add(arr[0] + "_" + arr[1]);
                     saveConnectionToDatabase(user, "help");
                 }
                 ctx.result("SUCCESS: Account created successfully!");
             }
         });
 
-        // 🌐 DYNAMIC PORT RESOLUTION: Fixes host platform timeout disconnects
+        // --- API GET USERS DIRECTORY ---
+        app.get("/api/users", ctx -> {
+            String viewer = ctx.queryParam("viewer");
+            if (viewer != null) {
+                viewer = viewer.trim().toLowerCase();
+                userLastSeen.put(viewer, System.currentTimeMillis());
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            long now = System.currentTimeMillis();
+
+            for (String username : userDatabase.keySet()) {
+                long lastSeen = userLastSeen.getOrDefault(username, 0L);
+                boolean isOnline = (now - lastSeen) < 10000; // 10 second window
+                
+                String status = "NONE";
+                if (viewer != null && !viewer.equals(username)) {
+                    String[] arr = {viewer, username}; java.util.Arrays.sort(arr);
+                    if (establishedConnections.contains(arr[0] + "_" + arr[1])) {
+                        status = "CONNECTED";
+                    } else if (activeInvites.getOrDefault(viewer, "").equals(username) || 
+                               activeInvites.getOrDefault(username, "").equals(viewer)) {
+                        status = "PENDING";
+                    }
+                } else if (viewer != null && viewer.equals(username)) {
+                    status = "SELF";
+                }
+
+                String avatar = userProfilePics.getOrDefault(username, "NONE");
+                sb.append(username).append("###")
+                  .append(isOnline).append("###")
+                  .append("0").append("###") // unread placeholder
+                  .append(status).append("###")
+                  .append(avatar).append("$$$");
+            }
+            ctx.result(sb.toString());
+        });
+
+        // --- API DISPATCH CHAT INVITATION ---
+        app.get("/api/sendInvite", ctx -> {
+            String from = ctx.queryParam("from");
+            String to = ctx.queryParam("to");
+            if (from != null && to != null) {
+                activeInvites.put(to.trim().toLowerCase(), from.trim().toLowerCase());
+                ctx.result("SUCCESS");
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        // --- API CHECK FOR ACTIVE INVITES ---
+        app.get("/api/checkInvites", ctx -> {
+            String user = ctx.queryParam("user");
+            if (user != null) {
+                String sender = activeInvites.get(user.trim().toLowerCase());
+                if (sender != null) {
+                    ctx.result("PENDING:" + sender);
+                    return;
+                }
+            }
+            ctx.result("NONE");
+        });
+
+        // --- API RESPOND TO CHAT INVITATION ---
+        app.get("/api/respondInvite", ctx -> {
+            String user = ctx.queryParam("user");
+            String action = ctx.queryParam("action");
+            if (user != null && action != null) {
+                user = user.trim().toLowerCase();
+                String sender = activeInvites.remove(user);
+                if (sender != null && action.equalsIgnoreCase("accept")) {
+                    String[] arr = {user, sender}; java.util.Arrays.sort(arr);
+                    establishedConnections.add(arr[0] + "_" + arr[1]);
+                    saveConnectionToDatabase(user, sender);
+                }
+                ctx.result("SUCCESS");
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        // --- API VERIFY CONNECTION GATEWAY ---
+        app.get("/api/checkConnection", ctx -> {
+            String u1 = ctx.queryParam("user1");
+            String u2 = ctx.queryParam("user2");
+            if (u1 != null && u2 != null) {
+                String[] arr = {u1.trim().toLowerCase(), u2.trim().toLowerCase()}; 
+                java.util.Arrays.sort(arr);
+                if (u1.equalsIgnoreCase(u2) || establishedConnections.contains(arr[0] + "_" + arr[1])) {
+                    ctx.result("TRUE");
+                    return;
+                }
+            }
+            ctx.result("FALSE");
+        });
+
+        // --- API READ CHAT MESSAGES ---
+        app.get("/api/getMessages", ctx -> {
+            String from = ctx.queryParam("from");
+            String to = ctx.queryParam("to");
+            if (from != null && to != null) {
+                String[] arr = {from.trim().toLowerCase(), to.trim().toLowerCase()}; 
+                java.util.Arrays.sort(arr);
+                String roomKey = arr[0] + "_" + arr[1];
+                ArrayList<String> history = chatHistories.getOrDefault(roomKey, new ArrayList<>());
+                ctx.result(String.join("\n", history));
+            } else {
+                ctx.result("");
+            }
+        });
+
+        // --- API TRANSMIT CHAT MESSAGE ---
+        app.post("/api/sendMessage", ctx -> {
+            String from = ctx.queryParam("from");
+            String to = ctx.queryParam("to");
+            String body = ctx.body();
+            if (from != null && to != null && !body.trim().isEmpty()) {
+                from = from.trim().toLowerCase();
+                to = to.trim().toLowerCase();
+                String[] arr = {from, to}; java.util.Arrays.sort(arr);
+                String roomKey = arr[0] + "_" + arr[1];
+                
+                String structuredToken = from + ":" + body;
+                chatHistories.computeIfAbsent(roomKey, k -> new ArrayList<>()).add(structuredToken);
+                saveMessageToDatabase(roomKey, structuredToken);
+                ctx.result("SUCCESS");
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        // --- API UPLOAD AVATAR PIC ---
+        app.post("/api/uploadProfilePic", ctx -> {
+            String user = ctx.queryParam("user");
+            String body = ctx.body();
+            if (user != null && !body.trim().isEmpty()) {
+                user = user.trim().toLowerCase();
+                userProfilePics.put(user, body);
+                saveProfilePicToDatabase(user, body);
+                ctx.result("UPLOAD_SUCCESSFUL");
+            } else {
+                ctx.result("UPLOAD_FAILED");
+            }
+        });
+
+        // --- API SAVE PUSH NOTIFICATION SUBSCRIPTION ---
+        app.post("/api/saveSubscription", ctx -> {
+            String username = ctx.queryParam("username");
+            if (username != null) {
+                pushSubscriptions.put(username.trim().toLowerCase(), ctx.body());
+                ctx.result("SAVED");
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
         String portEnv = System.getenv("PORT");
         int port = (portEnv != null) ? Integer.parseInt(portEnv) : 7070;
         app.start(port);
     }
-
-    // --- Core Database Utilities ---
 
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
         try (Connection conn = DriverManager.getConnection(DB_URL); Statement stmt = conn.createStatement()) {
