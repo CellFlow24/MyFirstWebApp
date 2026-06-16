@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Enterprise Control Dashboard</title>
     <style>
-        /*
-         * DIPSUM APP COLOR SCHEME - LOGO-INSPIRED CUTE-THEME UPDATE
-         */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #d1e49c; 
@@ -17,6 +14,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
+            overflow: hidden;
         }
         .login-field {
             width: 100%; padding: 12px; margin-bottom: 15px;
@@ -26,6 +24,7 @@
         .app-card {
             background-color: #fffdf5; border: none; padding: 30px;
             border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: center;
+            width: 360px; z-index: 100;
         }
         h2 { margin-top: 0; font-size: 24px; font-weight: 600; color: #aad052; } 
         p { color: #ffc8b0; font-size: 14px; margin-bottom: 30px; line-height: 1.5; } 
@@ -38,16 +37,17 @@
         .sync-btn:active { transform: scale(0.98); }
 
         .lounge-container {
-            display: flex; width: 900px; height: 600px; background: #fffdf5;       
+            display: none; width: 900px; height: 600px; background: #fffdf5;       
             border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); overflow: hidden;
+            z-index: 50;
         }
         .lounge-sidebar {
             width: 30%; background-color: #fffdf5; padding: 20px;
-            border-right: 1px solid #d1e49c; 
+            border-right: 1px solid #d1e49c; box-sizing: border-box;
         }
         .lounge-main {
             width: 70%; display: flex; justify-content: center; align-items: center;
-            color: #334155; text-align: center; background-color: #fffdf5; 
+            color: #334155; text-align: center; background-color: #fffdf5; box-sizing: border-box;
         }
         .profile-section { display: flex; align-items: center; gap: 12px; }
         .dp-circle {
@@ -56,7 +56,6 @@
             align-items: center; font-size: 20px; color: white;
         }
 
-        /* MODAL LAYOUT */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(209, 228, 156, 0.85); backdrop-filter: blur(4px);
@@ -154,7 +153,6 @@
         }
         .tool-action-btn:hover { background: #aad052; color: white; }
 
-        /* MOBILE RESPONSIVE OVERRIDES */
         @media screen and (max-width: 768px) {
             html, body { display: block !important; height: 100dvh !important; width: 100vw !important; overflow: hidden !important; position: fixed !important; top: 0; left: 0; }
             .app-card { margin: 0 !important; width: 90% !important; max-width: 360px !important; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
@@ -190,7 +188,8 @@
     <link rel="manifest" href="/manifest.json">
 </head>
 <body>
-<div class="app-card" id="loginCard">
+
+<div class="app-card" id="loginCard" style="display: block !important;">
     <img src="dipsum-logo.png" alt="Dipsum Logo" class="alive-logo" style="width: 240px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
     <h2 id="authTitle">Your Secure Chat Portal</h2>
     <p style="margin-top: 20px; font-size: 18px; color: #b31e41;" id="authDescription">Pull up a cushion and stay a while. 🧸</p>
@@ -206,7 +205,7 @@
     </p>
 </div>
 
-<div id="chatLounge" class="lounge-container" style="display: none;">
+<div id="chatLounge" class="lounge-container" style="display: none !important;">
     <div class="lounge-sidebar">
         <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
             <input type="file" id="userProfilePicUploader" accept="image/*" style="display: none;" onchange="executeOwnProfilePicUpload(this)">
@@ -254,24 +253,17 @@
 </div>
 
 <script>
-    // 🌐 ABSOLUTE BACKEND ROUTING: Forces frontend to look at your live Railway server
     const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
 
-    // 🎵 DUAL NOTIFICATION SOUND ENGINE
     let totalUnreadMessagesTracked = 0;
-    const backgroundChime = new Audio('tune1.mp3'); // 📥 For background unread badge increases
-    const activeChatChime = new Audio('tune2.mp3'); // 💬 For new messages sliding into the open chat
+    const backgroundChime = new Audio('tune1.mp3'); 
+    const activeChatChime = new Audio('tune2.mp3'); 
 
     let refreshLoop = null;
     let currentInviteSender = null;
     let isSignUpMode = false;
     let activeChatTarget = null; 
     let currentLoadedMessageCount = 0; 
-
-    window.addEventListener('DOMContentLoaded', () => {
-        // Auto-login bypassed. 
-        // The user will always see the login card when opening the app.
-    });
 
     function toggleAuthMode() {
         isSignUpMode = !isSignUpMode;
@@ -310,7 +302,6 @@
         authBtn.innerText = isSignUpMode ? "Registering..." : "Authenticating...";
         const endpoint = isSignUpMode ? "/api/register" : "/api/login";
     
-        // Explicitly fallback to relative routes if backendBaseUrl is empty
         const base = (typeof backendBaseUrl !== 'undefined' && backendBaseUrl) ? backendBaseUrl : "";
         const targetUrl = `${base}${endpoint}?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
 
@@ -323,12 +314,11 @@
                         displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
                         toggleAuthMode();
                     } else {
-                        // SESSION STORAGE PERSISTENCE REMOVED: Auto-login bypassed here 
-                        document.getElementById('loginCard').style.display = 'none';
-                        document.getElementById('chatLounge').style.display = 'flex';
+                        // Crucial fix: Completely isolate views to prevent side-by-side overlap bug
+                        document.getElementById('loginCard').style.setProperty('display', 'none', 'important');
+                        document.getElementById('chatLounge').style.setProperty('display', 'flex', 'important');
                         document.getElementById('currentProfileName').innerText = username.toLowerCase();
                     
-                        // Fire core application worker streams
                         startAppSynchronization();
                         if (typeof setupPushNotifications === 'function') {
                             setupPushNotifications(username.toLowerCase());
@@ -341,35 +331,32 @@
             .catch(err => {
                 authBtn.innerText = initialBtnText;
                 console.error(err);
-                displaySystemAlert("Network Error", "Failed to contact the backend infrastructure server.", "📡");
+                displaySystemAlert("Network Error", "Failed to contact the backend infrastructure server. Verify server status.", "📡");
             });
     }
 
     function executeAppLogout() {
-        // 1. Stop background syncing
         if (refreshLoop) clearInterval(refreshLoop);
         activeChatTarget = null;
         currentLoadedMessageCount = 0;
         
-        // 2. Hide the lounge and show the login card
-        document.getElementById('chatLounge').style.display = 'none';
-        document.getElementById('loginCard').style.display = 'block';
+        document.getElementById('chatLounge').style.setProperty('display', 'none', 'important');
+        document.getElementById('loginCard').style.setProperty('display', 'block', 'important');
         
-        // 3. Clear the input fields for the next login
         document.getElementById('usernameInput').value = '';
         document.getElementById('passwordInput').value = '';
-        
-        // 4. Ensure mobile view is reset
         document.body.classList.remove('mobile-chat-view-engaged');
     }
     
     function startAppSynchronization() {
+        if(refreshLoop) clearInterval(refreshLoop);
         syncCycle();
         refreshLoop = setInterval(syncCycle, 2000); 
     }
 
     function syncCycle() {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if(!user || user === "username") return;
 
         fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
             .then(res => res.text())
@@ -438,7 +425,7 @@
                     if (relationshipStatus === "CONNECTED") {
                         actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
                     } else if (relationshipStatus === "PENDING") {
-                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
+                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled>Waiting...</button>`;
                     } else {
                         actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
                                 onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
@@ -457,10 +444,10 @@
                 });
 
                 if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
-                    backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
+                    backgroundChime.play().catch(e => console.log("Audio playback raw engine hold."));
                 }
                 totalUnreadMessagesTracked = currentCycleUnreadSum;
-            });
+            }).catch(err => console.error("Sync read failure:", err));
 
         if (activeChatTarget) {
             fetchActiveChatMessages(user, activeChatTarget);
@@ -478,25 +465,21 @@
                         modal.classList.add('active');
                     }
                 }
-            });
+            }).catch(err => console.error("Invite gateway poll down:", err));
     }
 
     function sendChatInvite(targetUsername) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
         fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(user)}&to=${encodeURIComponent(targetUsername)}`)
             .then(res => res.text())
             .then(response => {
                 if (response.trim() === "SUCCESS") syncCycle();
-                else alert("Failed to send chat invitation. Please try again.");
-            })
-            .catch(err => console.error("Error dispatching invitation:", err));
+            });
     }
 
     function submitInviteResponse(isAccepted) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         const action = isAccepted ? "accept" : "decline";
-
         document.getElementById('inviteModal').classList.remove('active');
 
         fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(user)}&action=${action}`)
@@ -521,12 +504,10 @@
             .then(res => res.text())
             .then(isAllowed => {
                 if (isAllowed.trim() === "TRUE") {
-
                     currentLoadedMessageCount = 0;
                     activeChatTarget = targetUsername;
 
                     let loungeMain = document.querySelector('.lounge-main');
-                    if (!loungeMain) loungeMain = document.querySelector('div[style*="flex: 1"]') || document.querySelector('div[style*="flex:1"]');
                     if (!loungeMain) return;
 
                     let headerAvatarHtml = "";
@@ -543,43 +524,25 @@
                     loungeMain.innerHTML = `
                 <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
                     <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
-
-                        <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
-
+                        <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; display:none;">❮</button>
                         ${headerAvatarHtml}
-
                         <div class="header-meta-box">
                             <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px; line-height: 1.2;">${capitalizeFirstLetter(targetUsername)}</div>
-
-                            <div id="userStatusWrapper" class="status-round-container">
-                                ${initialStatusIconHtml}
-                            </div>
+                            <div id="userStatusWrapper" class="status-round-container">${initialStatusIconHtml}</div>
                         </div>
                     </div>
-
                     <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background:#baa2a0;"></div>
-
                     <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
-                        <span onclick="injectEmojiToken('😀')">😀</span>
-                        <span onclick="injectEmojiToken('👍')">👍</span>
-                        <span onclick="injectEmojiToken('❤️')">❤️</span>
-                        <span onclick="injectEmojiToken('🥰')">🥰</span>
-                        <span onclick="injectEmojiToken('🌹')">🌹</span>
-                        <span onclick="injectEmojiToken('💖')">💖</span>
-                        <span onclick="injectEmojiToken('😘')">😘</span>
+                        <span onclick="injectEmojiToken('😀')">😀</span><span onclick="injectEmojiToken('👍')">👍</span>
+                        <span onclick="injectEmojiToken('❤️')">❤️</span><span onclick="injectEmojiToken('🥰')">🥰</span>
+                        <span onclick="injectEmojiToken('🌹')">🌹</span><span onclick="injectEmojiToken('💖')">💖</span>
                     </div>
-
                     <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
-
                         <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
-
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
-
-                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight, 120)+'px';"></textarea>
-
-                        <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
-
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer;" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer;" onclick="toggleEmojiDrawerOverlay()">😊</button>
+                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; resize:none; height:45px;" onkeydown="handleChatKeyDown(event)"></textarea>
+                        <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; border-radius: 50% !important; background: #99464b !important;" onclick="triggerMessageDispatch()">➤</button>
                     </div>
                 </div>
             `;
@@ -588,23 +551,12 @@
                         const backBtn = loungeMain.querySelector('.mobile-back-nav-btn');
                         if(backBtn) backBtn.style.setProperty('display', 'block', 'important');
                     }
-
                     document.body.classList.add('mobile-chat-view-engaged');
-
-                    const activeChatLog = document.getElementById('chatLogDisplay');
-                    if (activeChatLog) {
-                        const keyboardResizeObserver = new ResizeObserver(() => {
-                            activeChatLog.scrollTop = activeChatLog.scrollHeight;
-                        });
-                        keyboardResizeObserver.observe(activeChatLog);
-                    }
-
                     fetchActiveChatMessages(user, targetUsername);
                 } else {
-                    displaySystemAlert("Security Access Violation", `You do not have an active secure transmission channel.`, "🔒");
+                    displaySystemAlert("Security Access Violation", `Active Secure Channel Required.`, "🔒");
                 }
-            })
-            .catch(err => console.error("Error executing security header gateway sync:", err));
+            });
     }   
     
     function fetchActiveChatMessages(currentUser, targetUser) {
@@ -621,19 +573,12 @@
                 }
 
                 const incomingMessageTokens = data.split('\n');
+                if (incomingMessageTokens.length === currentLoadedMessageCount) return;
 
-                if (currentLoadedMessageCount === 0) {
-                    logBox.innerHTML = "";
-                } else if (incomingMessageTokens.length === currentLoadedMessageCount) {
-                    return;
-                }
-
-                const isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
-                const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
-                
+                logBox.innerHTML = "";
                 let hasFreshIncomingMessage = false;
 
-                newPacketsToAppend.forEach(msgToken => {
+                incomingMessageTokens.forEach(msgToken => {
                     const separatorIndex = msgToken.indexOf(':');
                     if (separatorIndex === -1) return;
 
@@ -660,30 +605,21 @@
                 });
 
                 if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) {
-                    activeChatChime.play().catch(e => console.log("Audio autoplay prevented."));
+                    activeChatChime.play().catch(e => {});
                 }
-
                 currentLoadedMessageCount = incomingMessageTokens.length;
-
-                if (isScrolledToBottom || currentLoadedMessageCount === incomingMessageTokens.length) {
-                    logBox.scrollTop = logBox.scrollHeight;
-                }
-            })
-            .catch(err => console.error("Error synchronizing active conversation state:", err));
+                logBox.scrollTop = logBox.scrollHeight;
+            });
     }
 
     function toggleEmojiDrawerOverlay() {
         const drawer = document.getElementById('emojiMiniDrawer');
-        if(!drawer) return;
-        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
+        if(drawer) drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
     }
 
     function injectEmojiToken(emojiChar) {
         const inputField = document.getElementById('msgInputField');
-        if(inputField) {
-            inputField.value += emojiChar;
-            inputField.focus();
-        }
+        if(inputField) { inputField.value += emojiChar; inputField.focus(); }
         document.getElementById('emojiMiniDrawer').style.display = 'none';
     }
 
@@ -697,15 +633,8 @@
             img.onload = function() {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-
-                const maxW = 400; const maxH = 400;
-                let w = img.width; let h = img.height;
-
-                if (w > h) { if (w > maxW) { h *= maxW / w; w = maxW; } } 
-                else { if (h > maxH) { w *= maxH / h; h = maxH; } }
-
-                canvas.width = w; canvas.height = h;
-                ctx.drawImage(img, 0, 0, w, h);
+                canvas.width = 300; canvas.height = 300;
+                ctx.drawImage(img, 0, 0, 300, 300);
 
                 const compressedBase64DataString = canvas.toDataURL('image/jpeg', 0.6);
                 const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
@@ -715,9 +644,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: encodedPayloadString
-                }).then(res => res.text()).then(() => {
-                        fileInput.value = "";
-                        fetchActiveChatMessages(user, activeChatTarget);
+                }).then(() => {
+                    fileInput.value = "";
+                    fetchActiveChatMessages(user, activeChatTarget);
                 });
             };
             img.src = event.target.result;
@@ -739,18 +668,15 @@
         let messageContent = inputField.value.trim();
         if(!messageContent || !activeChatTarget) return;
 
-        messageContent = messageContent.replace(/\n/g, "<br>");
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
         inputField.value = "";
-        inputField.style.height = "45px";
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: messageContent
-        }).then(res => res.text()).then(() => {
-                fetchActiveChatMessages(user, activeChatTarget);
+        }).then(() => {
+            fetchActiveChatMessages(user, activeChatTarget);
         });
     }
 
@@ -761,16 +687,14 @@
         document.getElementById('systemAlertModal').style.display = 'flex';
     }
 
+    document.addEventListener("DOMContentLoaded", function() {
+        // Double-check interface is perfectly clear on initialization
+        document.getElementById('loginCard').style.setProperty('display', 'block', 'important');
+        document.getElementById('chatLounge').style.setProperty('display', 'none', 'important');
+    });
+
     function dismissCustomSystemAlert() {
         document.getElementById('systemAlertModal').style.display = 'none';
-
-        // If a broken auto-session caused the crash, force return to the login panel
-        if (document.getElementById('chatLounge').style.display !== 'flex') {
-            localStorage.removeItem('dipsum_logged_user');
-            document.getElementById('loginCard').style.display = 'block';
-            const authBtn = document.getElementById('authBtn');
-            if (authBtn) authBtn.innerText = "Access Account";
-        }
     }
     function capitalizeFirstLetter(string) {
         if (!string) return "";
@@ -787,32 +711,19 @@
             img.onload = function() {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
+                canvas.width = 150; canvas.height = 150;
+                ctx.drawImage(img, 0, 0, 150, 150);
 
-                const targetSize = 300;
-                canvas.width = targetSize; canvas.height = targetSize;
-
-                let srcX = 0; let srcY = 0;
-                let srcSize = Math.min(img.width, img.height);
-
-                if (img.width > img.height) srcX = (img.width - img.height) / 2;
-                else srcY = (img.height - img.width) / 2;
-
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, targetSize, targetSize);
-
-                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.92);
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
                 const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
                 fetch(`${backendBaseUrl}/api/uploadProfilePic?user=${encodeURIComponent(user)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: compressedBase64
-                }).then(res => res.text()).then(status => {
-                        if(status === "UPLOAD_SUCCESSFUL") {
-                            document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
-                            syncCycle();
-                        }
+                }).then(() => {
+                    document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                    syncCycle();
                 });
             };
             img.src = event.target.result;
@@ -833,41 +744,24 @@
         else wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
     }
 
-    // =========================================================================
-    // 🔔 NATIVE SYSTEM PUSH NOTIFICATION SUBSCRIPTION ENGINE
-    // =========================================================================
-
     function setupPushNotifications(username) {
-        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-            console.log("Native Push Notifications are not supported by this browser client.");
-            return;
-        }
-
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
-                console.log('OS Notification layer permission cleared successfully!');
-                
                 navigator.serviceWorker.ready.then(registration => {
                     registration.pushManager.getSubscription().then(subscription => {
                         if (subscription) {
                             sendSubscriptionToServer(subscription, username);
-                            return subscription;
+                            return;
                         }
-
-                        // 🚨 PASTE YOUR GENERATED PUBLIC KEY HERE:
                         const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
                         const convertedApplicationKey = urlBase64ToUint8Array(publicVapidKey);
-
                         return registration.pushManager.subscribe({
                             userVisibleOnly: true,
                             applicationServerKey: convertedApplicationKey
-                        }).then(newSubscription => {
-                            sendSubscriptionToServer(newSubscription, username);
-                        });
-                    }).catch(err => console.error("Could not register browser push properties:", err));
+                        }).then(newSubscription => sendSubscriptionToServer(newSubscription, username));
+                    });
                 });
-            } else {
-                console.warn('System push notifications blocked by user device preferences.');
             }
         });
     }
@@ -877,8 +771,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(subscription)
-        }).then(res => res.text()).then(statusText => console.log("System Push Registration Sync status:", statusText))
-          .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
+        });
     }
 
     function urlBase64ToUint8Array(base64String) {
@@ -886,18 +779,14 @@
         const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
         const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
+        for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
         return outputArray;
     }
 </script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('Service Worker successfully registered!', reg))
-        .catch(err => console.error('Service worker registration failed:', err));
+      navigator.serviceWorker.register('/sw.js').catch(err => console.error(err));
     });
   }
 </script>
