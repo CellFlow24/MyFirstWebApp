@@ -39,7 +39,7 @@ self.addEventListener('activate', function(event) {
 
 // Network-first fetch strategy (Completely ignores API traffic)
 self.addEventListener('fetch', function(event) {
-  // Use traditional indexOf to avoid any strict IDE validation issues
+  // Bypasses caching for chat data updates entirely to ensure live messaging works
   if (event.request.url.indexOf('/api/') !== -1) return;
   if (event.request.method !== 'GET') return;
 
@@ -52,9 +52,9 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-// Listen for application update triggers
+// Listen for application updates
 self.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (event.data === 'skipWaiting') {
     self.skipWaiting();
   }
 });
