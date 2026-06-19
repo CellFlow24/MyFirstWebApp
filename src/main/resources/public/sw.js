@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dipsum-v7';
+const CACHE_NAME = 'dipsum-v8';
 const ASSETS = [
   '/index.html',
   '/dipsum-logo.png',
@@ -57,4 +57,55 @@ self.addEventListener('message', function(event) {
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
   }
+});
+
+// ==========================================
+// 🔔 PUSH NOTIFICATION ENGINE (Restored)
+// ==========================================
+
+self.addEventListener('push', event => {
+  const promise = (async () => {
+    let title = 'Dipsum';
+    let body = 'You have a new message';
+    let url = '/';
+
+    if (event.data) {
+      try {
+        const data = event.data.json();
+        title = data.title || title;
+        body = data.body || body;
+        url = data.url || url;
+      } catch (e) {
+        body = event.data.text();
+      }
+    }
+
+    // Force show - this bypasses Chrome's quiet notification UI
+    await self.registration.showNotification(title, {
+      body: body,
+      icon: '/dipsum-logo.png',
+      badge: '/dipsum-logo.png',
+      vibrate: [300, 100, 300, 100, 300],
+      requireInteraction: true,
+      tag: 'dipsum-msg-' + Date.now(), // Unique tag = every message shows separately
+      renotify: true,
+      silent: false,
+      data: { url: url }
+    });
+  })();
+
+  // CRITICAL: Must pass the promise or Android kills the SW before notification shows
+  event.waitUntil(promise);
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if (client.url.includes('/') && 'focus' in client) return client.focus();
+      }
+      return clients.openWindow('/');
+    })
+  );
 });
