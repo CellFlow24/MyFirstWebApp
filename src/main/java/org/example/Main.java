@@ -13,42 +13,40 @@ public class Main {
     // 👤 Global Core Storage: Maps username -> Base64 Image Payload String (Backed by SQL)
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
 
-    // Dynamic Database URL determination for Railway Volume compatibility vs Local execution
-    private static final String DB_URL = getDatabaseUrl();
-
-    private static String getDatabaseUrl() {
-        java.io.File railwayVolumeDir = new java.io.File("/app/data");
-        if (railwayVolumeDir.exists() && railwayVolumeDir.isDirectory()) {
-            return "jdbc:sqlite:/app/data/chatlounge.db";
-        }
-        return "jdbc:sqlite:chatlounge.db";
-    }
+    // 🛡️ Smart Database Router: Protects your existing data by routing to the correct location
+    private static final String DB_URL = (new java.io.File("/app/data").exists()) 
+        ? "jdbc:sqlite:/app/data/chatlounge.db" 
+        : "jdbc:sqlite:src/main/resources/chatlounge.db";
 
     public static void main(String[] args) {
         // 1. Registered User Base
         HashMap<String, String> userDatabase = new HashMap<>();
 
-        // 2. Heartbeat Monitor: Track when users last pinged the server (Kept in RAM, resets naturally)
+        // 2. Heartbeat Monitor
         HashMap<String, Long> userLastSeen = new HashMap<>();
 
         // 3. Pending Incoming Invitations (Receiver -> Sender)
         HashMap<String, String> activeInvites = new HashMap<>();
 
-        // 4. Multi-Chat Map: Tracks who has open channels with whom ("user1:user2")
+        // 4. Multi-Chat Map
         HashSet<String> establishedConnections = new HashSet<>();
 
-        // 5. Unread Message Counter Map (Recipient#Sender -> Count)
+        // 5. Unread Message Counter Map
         HashMap<String, Integer> unreadCounts = new HashMap<>();
 
-        // 6. Global Chat Repository (RoomKey -> List of encoded message tokens "sender:text")
+        // 6. Global Chat Repository
         HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
 
         // 💾 LOAD ALL DATA FROM DATABASE FILE ON STARTUP
         initializeDatabase(userDatabase, establishedConnections, chatHistories);
 
         Javalin app = Javalin.create(config -> {
-            config.staticFiles.add("/", Location.CLASSPATH);
+            // 📂 Tells Javalin to look inside your public subfolder
+            config.staticFiles.add("/public", Location.CLASSPATH);
         });
+
+        // Automatically redirect visitors to index.html
+        app.get("/", ctx -> ctx.redirect("/index.html"));
 
         // --- 🚪 API CHANNELS & SECURITY GATES ---
 
@@ -57,7 +55,7 @@ public class Main {
             String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
             if (user != null) user = user.trim().toLowerCase();
 
-            if (userDatabase.containsKey(user) && userDatabase.get(user).equals(pass)) {
+            if (user != null && userDatabase.containsKey(user) && userDatabase.get(user).equals(pass)) {
                 userLastSeen.put(user, System.currentTimeMillis());
                 ctx.result("SUCCESS: Access Granted!");
             } else {
@@ -70,6 +68,11 @@ public class Main {
             String pass = ctx.queryParam("password") != null ? ctx.queryParam("password") : ctx.queryParam("pass");
             if (user != null) user = user.trim().toLowerCase();
 
+            if (user == null || pass == null || user.trim().isEmpty() || pass.trim().isEmpty()) {
+                ctx.result("FAIL: Username and password cannot be empty!");
+                return;
+            }
+
             if (userDatabase.containsKey(user)) {
                 ctx.result("FAIL: Username already exists!");
             } else {
@@ -77,7 +80,7 @@ public class Main {
                 saveUserToDatabase(user, pass);
 
                 // 🤝 AUTO-CONNECT TO HELP CHANNEL IMMEDIATELY
-                if (user != null && !user.equals("help")) {
+                if (!user.equals("help")) {
                     establishedConnections.add(user + ":help");
                     establishedConnections.add("help:" + user);
                     saveConnectionToDatabase(user, "help");
@@ -144,9 +147,7 @@ public class Main {
             String cleanUser = user.trim().toLowerCase();
             userProfilePics.put(cleanUser, imagePayload);
 
-            // 💾 PERSIST PROFILE IMAGE TO DISK
             saveProfilePicToDatabase(cleanUser, imagePayload);
-
             ctx.result("UPLOAD_SUCCESSFUL");
         });
 
@@ -190,7 +191,6 @@ public class Main {
             chatHistories.putIfAbsent(roomKey, new ArrayList<>());
             chatHistories.get(roomKey).add(contentPayloadToken);
 
-            // 💾 PERSIST MESSAGE LOG TO DISK
             saveMessageToDatabase(roomKey, contentPayloadToken);
 
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
@@ -228,9 +228,7 @@ public class Main {
                 establishedConnections.add(cleanUser + ":" + sender);
                 establishedConnections.add(sender + ":" + cleanUser);
 
-                // 💾 PERSIST NEW ACCEPTED CHAT LINK TO DISK
                 saveConnectionToDatabase(cleanUser, sender);
-
                 System.out.println("--> [CHANNEL OPENED] " + cleanUser + " <--> " + sender);
             }
             ctx.result("SUCCESS");
@@ -277,22 +275,18 @@ public class Main {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
 
-            // 1. Create Tables
             stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT, PRIMARY KEY (user1, user2));");
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
 
-            // Seed base support account
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
 
-            // 2. Hydrate Accounts Map
             ResultSet rsUsers = stmt.executeQuery("SELECT username, password FROM users;");
             while (rsUsers.next()) {
                 userDatabase.put(rsUsers.getString("username"), rsUsers.getString("password"));
             }
 
-            // 3. Hydrate Verified Channel Links
             ResultSet rsConn = stmt.executeQuery("SELECT user1, user2 FROM connections;");
             while (rsConn.next()) {
                 String u1 = rsConn.getString("user1");
@@ -301,7 +295,6 @@ public class Main {
                 establishedConnections.add(u2 + ":" + u1);
             }
 
-            // 4. Hydrate Chat Log History Repositories
             ResultSet rsMsg = stmt.executeQuery("SELECT room_key, token FROM messages ORDER BY id ASC;");
             while (rsMsg.next()) {
                 String key = rsMsg.getString("room_key");
@@ -310,7 +303,6 @@ public class Main {
                 chatHistories.get(key).add(token);
             }
 
-            // 5. Hydrate Saved Custom Profile Icons
             ResultSet rsPics = stmt.executeQuery("SELECT username, payload FROM profile_pics;");
             while (rsPics.next()) {
                 userProfilePics.put(rsPics.getString("username"), rsPics.getString("payload"));
