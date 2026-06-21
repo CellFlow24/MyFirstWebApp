@@ -20,6 +20,7 @@ public class Main {
 
     public static ConcurrentHashMap<String, String> userProfilePics = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, Long> typingStatus = new ConcurrentHashMap<>();
 
     // Smart Database Router: Protects local testing while using Railway volume in production
     private static final String DB_URL = (new java.io.File("/app/data").exists()) 
@@ -303,17 +304,48 @@ public class Main {
             }
         });
 
+        app.get("/api/setTyping", ctx -> {
+            String from = ctx.queryParam("from");
+            String to = ctx.queryParam("to");
+            String typingStr = ctx.queryParam("typing");
+
+            if (from != null && to != null) {
+                String cleanFrom = from.trim().toLowerCase();
+                String cleanTo = to.trim().toLowerCase();
+                if ("true".equals(typingStr)) {
+                    typingStatus.put(cleanFrom + "#" + cleanTo, System.currentTimeMillis());
+                } else {
+                    typingStatus.remove(cleanFrom + "#" + cleanTo);
+                }
+                ctx.result("OK");
+            } else {
+                ctx.status(400).result("FAIL");
+            }
+        });
+
         app.get("/api/getMessages", ctx -> {
             String from = ctx.queryParam("from").trim().toLowerCase();
             String to = ctx.queryParam("to").trim().toLowerCase();
 
             String roomKey = (from.compareTo(to) < 0) ? from + "#" + to : to + "#" + from;
-            unreadCounts.put(from + "#" + to, 0);
+            unreadCounts.put(from + "#" + to, 0); // Mark messages as read by requester
 
             ArrayList<String> messages = chatHistories.getOrDefault(roomKey, new ArrayList<>());
-            ctx.result(String.join("\n", messages));
-        });
 
+            // Check if 'to' is typing to 'from' (valid for 3 seconds)
+            long lastTypingTime = typingStatus.getOrDefault(to + "#" + from, 0L);
+            boolean isTyping = (System.currentTimeMillis() - lastTypingTime) < 3000; 
+
+            // Count how many messages 'from' sent that 'to' has NOT read yet
+            int unreadByTo = unreadCounts.getOrDefault(to + "#" + from, 0);
+
+            // Sneak this metadata into the final response payload
+            ArrayList<String> outputData = new ArrayList<>(messages);
+            outputData.add("META::" + isTyping + "::" + unreadByTo);
+
+            ctx.result(String.join("\n", outputData));
+        });
+        
         String port = System.getenv("PORT");
         if (port != null) {
             app.start(Integer.parseInt(port));
