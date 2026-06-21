@@ -516,6 +516,7 @@
 
                     currentLoadedMessageCount = 0;
                     activeChatTarget = targetUsername;
+                    cancelReply(); // Clear any leftover reply states
 
                     let loungeMain = document.querySelector('.lounge-main');
                     if (!loungeMain) loungeMain = document.querySelector('div[style*="flex: 1"]') || document.querySelector('div[style*="flex:1"]');
@@ -539,6 +540,11 @@
                         50% { transform: translateY(-4px); opacity: 1; }
                     }
                     .paw-anim { display: inline-block; animation: pawBounce 0.9s infinite ease-in-out; margin: 0 1px; }
+                    
+                    /* --- NEW REPLY CSS --- */
+                    .msg-quoted { background: rgba(255,255,255,0.4); border-left: 3px solid #aad052; padding: 6px 8px; font-size: 12px; color: #555; margin-bottom: 6px; border-radius: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-style: italic; word-break: break-word; }
+                    .reply-action-btn { opacity: 0.4; cursor: pointer; font-size: 14px; margin: 0 8px; background: #fffdf5; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: all 0.2s; border: 1px solid #aad052; flex-shrink: 0; }
+                    .reply-action-btn:hover { opacity: 1; transform: scale(1.1); background: #aad052; }
                 </style>
                 <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
                     <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
@@ -570,6 +576,12 @@
                         <span onclick="injectEmojiToken('🌹')">🌹</span>
                         <span onclick="injectEmojiToken('💖')">💖</span>
                         <span onclick="injectEmojiToken('😘')">😘</span>
+                    </div>
+
+                    <div id="activeReplyBanner" style="display: none; background: #fdf8ef; padding: 8px 12px; border-left: 4px solid #aad052; font-size: 13px; color: #334155; position: relative; border-top: 1px solid #edbdb7; z-index: 10;">
+                        <span style="font-weight:bold; color:#aad052; font-size: 12px;">Replying to:</span>
+                        <div id="replyBannerText" style="margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:85%; opacity: 0.8; font-style: italic;"></div>
+                        <span onclick="cancelReply()" style="position: absolute; right: 10px; top: 8px; cursor: pointer; color: #961808; font-weight: bold; padding: 4px; font-size: 16px;">✕</span>
                     </div>
 
                     <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:8px; padding:12px; background:#e6c7c3; border-top:1px solid #edbdb7;">
@@ -658,12 +670,12 @@
                         const sender = msgToken.substring(0, separatorIndex);
                         let text = msgToken.substring(separatorIndex + 1);
 
-                        // --- NEW TIMESTEMP PARSING LOGIC ---
+                        // --- TIMESTEMP PARSING LOGIC ---
                         let timeStringFormatted = "";
                         const timeSplitIdx = text.lastIndexOf("|~|");
                         if (timeSplitIdx !== -1) {
                             const timestampMs = parseInt(text.substring(timeSplitIdx + 3), 10);
-                            text = text.substring(0, timeSplitIdx); // Remove timestamp from actual message
+                            text = text.substring(0, timeSplitIdx); 
                             
                             if (!isNaN(timestampMs)) {
                                 const dateObj = new Date(timestampMs);
@@ -671,6 +683,14 @@
                                 const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
                                 timeStringFormatted = `${datePart}, ${timePart}`;
                             }
+                        }
+
+                        // --- NEW: REPLY PARSING LOGIC ---
+                        let quotedText = "";
+                        const replyMatch = text.match(/\[REPLY\](.*?)\[\/REPLY\]/);
+                        if (replyMatch) {
+                            quotedText = replyMatch[1];
+                            text = text.replace(replyMatch[0], "").trim(); // Remove tags from the actual display message
                         }
 
                         if (sender !== currentUser) hasFreshIncomingMessage = true;
@@ -681,7 +701,7 @@
                         bubbleWrapper.style.flexDirection = 'column';
                         bubbleWrapper.className = (sender === currentUser) ? "msg-wrapper msg-outgoing-wrapper" : "msg-wrapper";
                         bubbleWrapper.style.alignSelf = (sender === currentUser) ? "flex-end" : "flex-start";
-                        bubbleWrapper.style.maxWidth = "65%";
+                        bubbleWrapper.style.maxWidth = "70%";
 
                         const bubble = document.createElement('div');
                         bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
@@ -700,27 +720,52 @@
                             bubble.innerText = text;
                         }
 
-                        bubbleWrapper.appendChild(bubble);
+                        // --- NEW: INJECT QUOTED BUBBLE INSIDE MESSAGE ---
+                        if (quotedText) {
+                            const quoteDiv = document.createElement('div');
+                            quoteDiv.className = 'msg-quoted';
+                            quoteDiv.innerText = quotedText;
+                            bubble.insertBefore(quoteDiv, bubble.firstChild);
+                        }
 
-                        // --- NEW META CONTAINER FOR TIME AND PAWS ---
+                        // --- NEW: ROW LAYOUT FOR REPLY BUTTON + BUBBLE ---
+                        const bubbleRow = document.createElement('div');
+                        bubbleRow.style.display = 'flex';
+                        bubbleRow.style.alignItems = 'center';
+
+                        // Create the tiny reply action button
+                        const replyBtn = document.createElement('button');
+                        replyBtn.className = 'reply-action-btn';
+                        replyBtn.innerHTML = '↩️';
+                        let plainTextToQuote = text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text;
+                        replyBtn.onclick = () => prepareReply(plainTextToQuote);
+
+                        // Attach button based on who sent it
+                        if (sender === currentUser) {
+                            bubbleRow.appendChild(replyBtn);
+                            bubbleRow.appendChild(bubble);
+                        } else {
+                            bubbleRow.appendChild(bubble);
+                            bubbleRow.appendChild(replyBtn);
+                        }
+
+                        bubbleWrapper.appendChild(bubbleRow);
+
+                        // --- META CONTAINER FOR TIME AND PAWS ---
                         const metaContainer = document.createElement('div');
                         metaContainer.style.cssText = 'display: flex; align-items: center; margin-top: 2px; padding: 0 4px;';
-                        
-                        // Align to the right for outgoing, left for incoming
                         metaContainer.style.justifyContent = (sender === currentUser) ? 'flex-end' : 'flex-start';
 
                         const timeSpan = document.createElement('span');
                         timeSpan.style.cssText = 'font-size: 10px; color: #7a1029; opacity: 0.7; font-weight: 500; margin-right: 5px;';
                         timeSpan.innerText = timeStringFormatted;
-
                         metaContainer.appendChild(timeSpan);
 
-                        // Attach the paw receipt exclusively to outgoing messages
                         if (sender === currentUser) {
                             const pawSpan = document.createElement('span');
                             pawSpan.className = 'msg-receipt-paw';
                             pawSpan.style.cssText = 'font-size: 11px; opacity: 0.8;';
-                            pawSpan.innerText = '🐾'; // Will be updated by the unread loop
+                            pawSpan.innerText = '🐾'; 
                             metaContainer.appendChild(pawSpan);
                         }
 
@@ -735,7 +780,7 @@
                     currentLoadedMessageCount = incomingMessageTokens.length;
                 }
 
-                // Update Read Receipts on outgoing messages without redrawing the whole UI
+                // Update Read Receipts
                 if (incomingMessageTokens.length > 0) {
                     const allOutWrappers = logBox.querySelectorAll('.msg-outgoing-wrapper');
                     const totalOut = allOutWrappers.length;
@@ -743,7 +788,6 @@
                     allOutWrappers.forEach((wrapper, index) => {
                         const receipt = wrapper.querySelector('.msg-receipt-paw');
                         if (receipt) {
-                            // Calculate if this specific message has been seen based on the unread count
                             if (index >= totalOut - unreadByTarget) {
                                 receipt.innerText = '🐾';
                             } else {
@@ -759,7 +803,7 @@
             })
             .catch(err => console.error("Error synchronizing active conversation state:", err));
     }
-
+    
     function handleTypingInput(field) {
         field.style.height='auto';
         field.style.height=Math.min(field.scrollHeight, 120)+'px';
@@ -791,6 +835,13 @@
         if(!messageContent || !activeChatTarget) return;
 
         messageContent = messageContent.replace(/\n/g, "<br>");
+        
+        // --- NEW: Attach the reply data if it exists ---
+        if (currentReplyContext !== "") {
+            messageContent = `[REPLY]${currentReplyContext}[/REPLY]` + messageContent;
+            cancelReply(); // Clear the banner after sending
+        }
+
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
         inputField.value = "";
@@ -808,7 +859,7 @@
                 fetchActiveChatMessages(user, activeChatTarget);
         });
     }
-
+    
     function toggleEmojiDrawerOverlay() {
         const drawer = document.getElementById('emojiMiniDrawer');
         if(!drawer) return;
@@ -997,6 +1048,28 @@
             outputArray[i] = rawData.charCodeAt(i);
         }
         return outputArray;
+    }
+
+    // --- NEW REPLY FEATURE VARIABLES & FUNCTIONS ---
+    let currentReplyContext = "";
+
+    function prepareReply(textToQuote) {
+        currentReplyContext = textToQuote;
+        const banner = document.getElementById('activeReplyBanner');
+        const bannerText = document.getElementById('replyBannerText');
+        if (banner && bannerText) {
+            banner.style.display = 'block';
+            bannerText.innerText = textToQuote;
+            document.getElementById('msgInputField').focus();
+        }
+    }
+
+    function cancelReply() {
+        currentReplyContext = "";
+        const banner = document.getElementById('activeReplyBanner');
+        if (banner) {
+            banner.style.display = 'none';
+        }
     }
 </script>
 <script>
