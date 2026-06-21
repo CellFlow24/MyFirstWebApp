@@ -196,7 +196,10 @@ public class Main {
             }
 
             String roomKey = (cleanFrom.compareTo(cleanTo) < 0) ? cleanFrom + "#" + cleanTo : cleanTo + "#" + cleanFrom;
-            String contentPayloadToken = cleanFrom + ":" + messageBody;
+            
+            // NEW: Append the exact timestamp using a secret separator |~|
+            long timestamp = System.currentTimeMillis();
+            String contentPayloadToken = cleanFrom + ":" + messageBody + "|~|" + timestamp;
 
             chatHistories.putIfAbsent(roomKey, new ArrayList<>());
             chatHistories.get(roomKey).add(contentPayloadToken);
@@ -205,7 +208,7 @@ public class Main {
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
 
-            // ✅ FIXED: Send push in background thread - never blocks the request
+            // Send push in background thread - never blocks the request
             String recipientSubJson = userSubscriptions.get(cleanTo);
             if (recipientSubJson != null && pushService != null) {
                 final String subJsonFinal = recipientSubJson;
@@ -231,7 +234,7 @@ public class Main {
                             sub.keys.p256dh,
                             sub.keys.auth,
                             payload.getBytes("UTF-8"),
-                            86400  // ✅ TTL = 24 hours - FCM will retry for 24hrs if phone is asleep
+                            86400  // TTL = 24 hours
                         );
                         HttpResponse response = pushService.send(notification);
                         int statusCode = response.getStatusLine().getStatusCode();
@@ -251,7 +254,7 @@ public class Main {
 
             ctx.result("MESSAGE_DISPATCHED_SUCCESSFULLY");
         });
-
+        
         app.get("/api/checkInvites", ctx -> {
             String currentUserName = ctx.queryParam("user");
             if (currentUserName == null) {
