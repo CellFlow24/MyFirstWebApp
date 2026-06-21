@@ -197,7 +197,6 @@ public class Main {
 
             String roomKey = (cleanFrom.compareTo(cleanTo) < 0) ? cleanFrom + "#" + cleanTo : cleanTo + "#" + cleanFrom;
             
-            // NEW: Append the exact timestamp using a secret separator |~|
             long timestamp = System.currentTimeMillis();
             String contentPayloadToken = cleanFrom + ":" + messageBody + "|~|" + timestamp;
 
@@ -208,7 +207,6 @@ public class Main {
             String unreadTrackingKey = cleanTo + "#" + cleanFrom;
             unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
 
-            // Send push in background thread - never blocks the request
             String recipientSubJson = userSubscriptions.get(cleanTo);
             if (recipientSubJson != null && pushService != null) {
                 final String subJsonFinal = recipientSubJson;
@@ -239,7 +237,6 @@ public class Main {
                         HttpResponse response = pushService.send(notification);
                         int statusCode = response.getStatusLine().getStatusCode();
 
-                        // Clean up expired/invalid subscriptions
                         if (statusCode == 410 || statusCode == 404) {
                             userSubscriptions.remove(toFinal);
                             deleteSubscriptionFromDatabase(toFinal);
@@ -331,18 +328,15 @@ public class Main {
             String to = ctx.queryParam("to").trim().toLowerCase();
 
             String roomKey = (from.compareTo(to) < 0) ? from + "#" + to : to + "#" + from;
-            unreadCounts.put(from + "#" + to, 0); // Mark messages as read by requester
+            unreadCounts.put(from + "#" + to, 0); 
 
             ArrayList<String> messages = chatHistories.getOrDefault(roomKey, new ArrayList<>());
 
-            // Check if 'to' is typing to 'from' (valid for 3 seconds)
             long lastTypingTime = typingStatus.getOrDefault(to + "#" + from, 0L);
             boolean isTyping = (System.currentTimeMillis() - lastTypingTime) < 3000; 
 
-            // Count how many messages 'from' sent that 'to' has NOT read yet
             int unreadByTo = unreadCounts.getOrDefault(to + "#" + from, 0);
 
-            // Sneak this metadata into the final response payload
             ArrayList<String> outputData = new ArrayList<>(messages);
             outputData.add("META::" + isTyping + "::" + unreadByTo);
 
@@ -427,7 +421,6 @@ public class Main {
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
-    // ✅ NEW: Cleans up dead subscriptions automatically
     private static void deleteSubscriptionFromDatabase(String u) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) {
