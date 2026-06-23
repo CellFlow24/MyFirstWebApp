@@ -541,10 +541,16 @@
                     }
                     .paw-anim { display: inline-block; animation: pawBounce 0.9s infinite ease-in-out; margin: 0 1px; }
                     
-                    /* --- NEW REPLY CSS --- */
+                    /* REPLY CSS */
                     .msg-quoted { background: rgba(255,255,255,0.4); border-left: 3px solid #aad052; padding: 6px 8px; font-size: 12px; color: #555; margin-bottom: 6px; border-radius: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-style: italic; word-break: break-word; }
                     .reply-action-btn { opacity: 0.4; cursor: pointer; font-size: 14px; margin: 0 8px; background: #fffdf5; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: all 0.2s; border: 1px solid #aad052; flex-shrink: 0; }
                     .reply-action-btn:hover { opacity: 1; transform: scale(1.1); background: #aad052; }
+
+                    /* --- NEW STICKER CSS --- */
+                    .sticker-drawer-panel { display: flex; gap: 8px; background: #1e293b; border: 1px solid #aad052; padding: 12px; border-radius: 20px; position: absolute; bottom: 70px; right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100; max-width: 280px; flex-wrap: wrap; justify-content: center; max-height: 220px; overflow-y: auto; }
+                    .sticker-drawer-panel img { width: 55px; height: 55px; cursor: pointer; transition: transform 0.1s ease; object-fit: contain; border-radius: 8px; }
+                    .sticker-drawer-panel img:hover { transform: scale(1.15); background: rgba(255,255,255,0.1); }
+                    .sticker-display-img { max-width: 140px; border-radius: 8px; margin-top: 4px; background: transparent; pointer-events: none; }
                 </style>
                 <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
                     <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
@@ -578,6 +584,10 @@
                         <span onclick="injectEmojiToken('😘')">😘</span>
                     </div>
 
+                    <div id="stickerMiniDrawer" class="sticker-drawer-panel" style="display: none;">
+                        ${stickerCollection.map(s => `<img src="stickers/${s}" onclick="sendSticker('${s}')">`).join('')}
+                    </div>
+
                     <div id="activeReplyBanner" style="display: none; background: #fdf8ef; padding: 8px 12px; border-left: 4px solid #aad052; font-size: 13px; color: #334155; position: relative; border-top: 1px solid #edbdb7; z-index: 10;">
                         <span style="font-weight:bold; color:#aad052; font-size: 12px;">Replying to:</span>
                         <div id="replyBannerText" style="margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:85%; opacity: 0.8; font-style: italic;"></div>
@@ -590,6 +600,8 @@
 
                         <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
+                        
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:20px; cursor:pointer; height: 42px; display: flex; align-items: center; margin-bottom: 2px;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
 
                         <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:12px 16px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:45px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)"></textarea>
 
@@ -685,12 +697,20 @@
                             }
                         }
 
-                        // --- NEW: REPLY PARSING LOGIC ---
+                        // --- REPLY PARSING LOGIC ---
                         let quotedText = "";
                         const replyMatch = text.match(/\[REPLY\](.*?)\[\/REPLY\]/);
                         if (replyMatch) {
                             quotedText = replyMatch[1];
-                            text = text.replace(replyMatch[0], "").trim(); // Remove tags from the actual display message
+                            text = text.replace(replyMatch[0], "").trim();
+                        }
+
+                        // --- NEW: STICKER PARSING LOGIC ---
+                        let stickerPath = "";
+                        const stickerMatch = text.match(/\[STICKER\](.*?)\[\/STICKER\]/);
+                        if (stickerMatch) {
+                            stickerPath = stickerMatch[1];
+                            text = text.replace(stickerMatch[0], "").trim(); 
                         }
 
                         if (sender !== currentUser) hasFreshIncomingMessage = true;
@@ -708,7 +728,13 @@
                         bubble.style.maxWidth = "100%"; 
                         bubble.style.alignSelf = "stretch";
 
-                        if (text.startsWith("IMG_ATTACHMENT_DATA:")) {
+                        // --- RENDER CONTENT (STICKER vs IMAGE vs TEXT) ---
+                        if (stickerPath) {
+                            bubble.innerHTML = `<img src="${stickerPath}" class="sticker-display-img">`;
+                            bubble.style.background = "transparent";
+                            bubble.style.padding = "0";
+                            bubble.style.boxShadow = "none";
+                        } else if (text.startsWith("IMG_ATTACHMENT_DATA:")) {
                             let rawBase64Source = text.replace("IMG_ATTACHMENT_DATA:", "");
                             if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) {
                                 rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
@@ -720,7 +746,7 @@
                             bubble.innerText = text;
                         }
 
-                        // --- NEW: INJECT QUOTED BUBBLE INSIDE MESSAGE ---
+                        // --- INJECT QUOTED BUBBLE INSIDE MESSAGE ---
                         if (quotedText) {
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'msg-quoted';
@@ -728,7 +754,7 @@
                             bubble.insertBefore(quoteDiv, bubble.firstChild);
                         }
 
-                        // --- NEW: ROW LAYOUT FOR REPLY BUTTON + BUBBLE ---
+                        // --- ROW LAYOUT FOR REPLY BUTTON + BUBBLE ---
                         const bubbleRow = document.createElement('div');
                         bubbleRow.style.display = 'flex';
                         bubbleRow.style.alignItems = 'center';
@@ -737,7 +763,9 @@
                         const replyBtn = document.createElement('button');
                         replyBtn.className = 'reply-action-btn';
                         replyBtn.innerHTML = '↩️';
-                        let plainTextToQuote = text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text;
+                        
+                        // Smart quoting based on content type
+                        let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
                         replyBtn.onclick = () => prepareReply(plainTextToQuote);
 
                         // Attach button based on who sent it
@@ -1048,6 +1076,54 @@
             outputArray[i] = rawData.charCodeAt(i);
         }
         return outputArray;
+    }
+    
+    // --- NEW STICKER ASSETS & LOGIC ---
+    const stickerCollection = [
+        'angry.png', 'baby.png', 'backhug.png', 'hmmm.png', 'hugs.png', 
+        'kiss.png', 'looks.png', 'sleep.png', 'ufbaby.png', 'uffhug.png', 'ufhug.png'
+    ];
+
+    function toggleStickerDrawerOverlay() {
+        const drawer = document.getElementById('stickerMiniDrawer');
+        if(!drawer) return;
+        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
+        
+        // Auto-close emoji drawer if it's open
+        const emojiDrawer = document.getElementById('emojiMiniDrawer');
+        if(emojiDrawer) emojiDrawer.style.display = 'none';
+    }
+
+    // UPDATED to close the sticker drawer if you open emojis
+    function toggleEmojiDrawerOverlay() {
+        const drawer = document.getElementById('emojiMiniDrawer');
+        if(!drawer) return;
+        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
+        
+        const stickerDrawer = document.getElementById('stickerMiniDrawer');
+        if(stickerDrawer) stickerDrawer.style.display = 'none';
+    }
+
+    function sendSticker(stickerFileName) {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if(!activeChatTarget) return;
+
+        let payload = `[STICKER]stickers/${stickerFileName}[/STICKER]`;
+        
+        // If the user is replying to someone WITH a sticker
+        if (currentReplyContext !== "") {
+            payload = `[REPLY]${currentReplyContext}[/REPLY]` + payload;
+            cancelReply(); 
+        }
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: payload
+        }).then(res => res.text()).then(() => {
+            document.getElementById('stickerMiniDrawer').style.display = 'none';
+            fetchActiveChatMessages(user, activeChatTarget);
+        });
     }
 
     // --- NEW REPLY FEATURE VARIABLES & FUNCTIONS ---
