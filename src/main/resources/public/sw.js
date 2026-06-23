@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dipsum-v13';
+const CACHE_NAME = 'dipsum-v14';
 const ASSETS = [
   '/index.html',
   '/dipsum-logo.png',
