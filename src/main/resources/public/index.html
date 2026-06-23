@@ -551,8 +551,12 @@
                     .sticker-drawer-panel img { width: 55px; height: 55px; cursor: pointer; transition: transform 0.1s ease; object-fit: contain; border-radius: 8px; }
                     .sticker-drawer-panel img:hover { transform: scale(1.15); background: rgba(255,255,255,0.1); }
                     .sticker-display-img { max-width: 140px; border-radius: 8px; margin-top: 4px; background: transparent; pointer-events: none; }
+
+                    /* OVERFLOW FIXES */
+                    .msg-bubble { word-break: break-word !important; overflow-wrap: anywhere !important; }
+                    .msg-bubble-media { max-width: 100% !important; object-fit: contain; }
                 </style>
-                <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
                     <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
 
                         <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
@@ -568,7 +572,7 @@
                         </div>
                     </div>
 
-                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; background: url('dc.png') repeat center center; background-size: cover;"></div>
+                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box;"></div>
 
                     <div id="typingIndicatorContainer" style="display:none; background: #e6c7c3; padding: 4px 20px; font-size: 13px; color: #961808; text-align: left; border-top: 1px solid #aad052;">
                         <i>${capitalizeFirstLetter(targetUsername)} is typing</i> <span class="paw-anim" style="animation-delay: 0s;">🐾</span><span class="paw-anim" style="animation-delay: 0.2s;">🐾</span><span class="paw-anim" style="animation-delay: 0.4s;">🐾</span>
@@ -594,7 +598,7 @@
                         <span onclick="cancelReply()" style="position: absolute; right: 10px; top: 8px; cursor: pointer; color: #961808; font-weight: bold; padding: 4px; font-size: 16px;">✕</span>
                     </div>
 
-                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:4px; padding:10px 6px; background:#e6c7c3; border-top:1px solid #edbdb7;">
+                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:4px; padding:10px 6px; background:#e6c7c3; border-top:1px solid #edbdb7; width: 100%; box-sizing: border-box;">
 
                         <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
 
@@ -663,9 +667,12 @@
                 }
 
                 const incomingMessageTokens = incomingTokensRaw.filter(t => t.trim() !== "");
-                let shouldScrollToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
+                
+                // --- SCROLL FIX: Only true if user is ALREADY at the bottom ---
+                let isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
+                let isInitialLoad = (currentLoadedMessageCount === 0);
 
-                if (currentLoadedMessageCount === 0) {
+                if (isInitialLoad) {
                     logBox.innerHTML = "";
                 }
 
@@ -704,7 +711,7 @@
                             text = text.replace(replyMatch[0], "").trim();
                         }
 
-                        // --- NEW: STICKER PARSING LOGIC ---
+                        // --- STICKER PARSING LOGIC ---
                         let stickerPath = "";
                         const stickerMatch = text.match(/\[STICKER\](.*?)\[\/STICKER\]/);
                         if (stickerMatch) {
@@ -720,7 +727,7 @@
                         bubbleWrapper.style.flexDirection = 'column';
                         bubbleWrapper.className = (sender === currentUser) ? "msg-wrapper msg-outgoing-wrapper" : "msg-wrapper";
                         bubbleWrapper.style.alignSelf = (sender === currentUser) ? "flex-end" : "flex-start";
-                        bubbleWrapper.style.maxWidth = "70%";
+                        bubbleWrapper.style.maxWidth = "85%"; // Widened to stop reply buttons from pushing text out
 
                         const bubble = document.createElement('div');
                         bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
@@ -757,6 +764,7 @@
                         const bubbleRow = document.createElement('div');
                         bubbleRow.style.display = 'flex';
                         bubbleRow.style.alignItems = 'center';
+                        bubbleRow.style.maxWidth = "100%"; // Prevent overflow
 
                         // Create the tiny reply action button
                         const replyBtn = document.createElement('button');
@@ -824,7 +832,8 @@
                     });
                 }
 
-                if (shouldScrollToBottom || currentLoadedMessageCount === incomingMessageTokens.length) {
+                // --- APPLY SCROLL FIX ---
+                if (isScrolledToBottom || isInitialLoad) {
                     logBox.scrollTop = logBox.scrollHeight;
                 }
             })
