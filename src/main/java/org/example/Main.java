@@ -342,6 +342,52 @@ public class Main {
 
             ctx.result(String.join("\n", outputData));
         });
+
+        // --- NEW: THE DEVELOPER ADMIN DELETION ROUTE ---
+        app.get("/api/deleteUser", ctx -> {
+            String admin = ctx.queryParam("admin");
+            String target = ctx.queryParam("target");
+
+            if (admin == null || target == null || !admin.trim().toLowerCase().equals("help")) {
+                ctx.status(403).result("UNAUTHORIZED");
+                return;
+            }
+
+            String cleanTarget = target.trim().toLowerCase();
+            if (cleanTarget.equals("help")) {
+                ctx.status(403).result("CANNOT_DELETE_ADMIN");
+                return;
+            }
+
+            // Wipe user from the permanent SQLite database
+            try (Connection conn = DriverManager.getConnection(DB_URL)) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM users WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM profile_pics WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM connections WHERE user1 = ? OR user2 = ?")) { ps.setString(1, cleanTarget); ps.setString(2, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE room_key LIKE ? OR room_key LIKE ?")) { 
+                    ps.setString(1, cleanTarget + "#%"); 
+                    ps.setString(2, "%#" + cleanTarget); 
+                    ps.executeUpdate(); 
+                }
+            } catch (SQLException e) {
+                System.err.println("DB Delete Error: " + e.getMessage());
+            }
+
+            // Wipe user from the active live memory
+            userDatabase.remove(cleanTarget);
+            userLastSeen.remove(cleanTarget);
+            activeInvites.remove(cleanTarget);
+            userProfilePics.remove(cleanTarget);
+            userSubscriptions.remove(cleanTarget);
+            
+            establishedConnections.removeIf(c -> c.startsWith(cleanTarget + ":") || c.endsWith(":" + cleanTarget));
+            chatHistories.keySet().removeIf(key -> key.startsWith(cleanTarget + "#") || key.endsWith("#" + cleanTarget));
+            unreadCounts.keySet().removeIf(key -> key.startsWith(cleanTarget + "#") || key.endsWith("#" + cleanTarget));
+            typingStatus.keySet().removeIf(key -> key.startsWith(cleanTarget + "#") || key.endsWith("#" + cleanTarget));
+
+            ctx.result("DELETED");
+        });
         
         String port = System.getenv("PORT");
         if (port != null) {
