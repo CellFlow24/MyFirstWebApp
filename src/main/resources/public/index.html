@@ -436,6 +436,12 @@
                                 onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
                     }
 
+                    // --- NEW: THE SECRET TRASH BUTTON ONLY FOR HELP ---
+                    let deleteBtnHtml = "";
+                    if (user === "help" && cleanName !== "help") {
+                        deleteBtnHtml = `<button style="background:none; border:none; color:#9c2e24; font-size:18px; cursor:pointer; margin-left:4px;" onclick="event.stopPropagation(); deleteUserAccount('${cleanName}')" title="Delete User">🗑️</button>`;
+                    }
+
                     row.innerHTML = `
                         <div style="display: flex; align-items: center; position: relative;">
                             <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
@@ -443,7 +449,10 @@
                             <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
                             ${unreadBadgeHtml}
                         </div>
-                        ${actionComponentHtml}
+                        <div style="display:flex; align-items:center;">
+                            ${actionComponentHtml}
+                            ${deleteBtnHtml}
+                        </div>
                     `;
                     listContainer.appendChild(row);
                 });
@@ -471,6 +480,27 @@
                     }
                 }
             });
+    }
+    
+    // --- NEW: THE DEVELOPER DELETION LOGIC ---
+    function deleteUserAccount(targetUsername) {
+        if (!confirm(`WARNING: Are you sure you want to completely delete ${targetUsername}'s account and all their chat data? This cannot be undone.`)) return;
+
+        const admin = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if (admin !== 'help') return;
+
+        fetch(`${backendBaseUrl}/api/deleteUser?admin=${encodeURIComponent(admin)}&target=${encodeURIComponent(targetUsername)}`)
+            .then(res => res.text())
+            .then(response => {
+                if (response === "DELETED") {
+                    if (activeChatTarget === targetUsername) exitActiveMobileChatView();
+                    syncCycle();
+                    alert(`✅ ${targetUsername} has been permanently deleted from the database.`);
+                } else {
+                    alert("❌ Failed to delete user.");
+                }
+            })
+            .catch(err => console.error("Deletion error:", err));
     }
 
     function sendChatInvite(targetUsername) {
@@ -1090,7 +1120,7 @@
     const stickerCollection = [
         'angry.png', 'baby.png', 'backhug.png', 'hmmm.png', 'hugs.png', 
         'kiss.png', 'looks.png', 'sleep.png', 'ufbaby.png', 'uffhug.png', 'ufhug.png', 'ggkiss.png',
-        'ghug.png', 'gkiss.png', 'gsleep.png'
+        'ghug.png', 'gkiss.png', 'gsleep.png', 'hand.png', 'head.png'
     ];
 
     function toggleStickerDrawerOverlay() {
