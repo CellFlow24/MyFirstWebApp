@@ -201,12 +201,14 @@
     const activeChatChime = new Audio('tune2.mp3'); 
     let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer, lastSyncPayload = ""; 
 
-    // --- E2EE SCRAMBLER ENGINE ---
+    // --- E2EE SCRAMBLER ENGINE (EMOJI SAFE) ---
     function encryptE2E(text, key) {
         let result = '';
         const encoded = unescape(encodeURIComponent(text));
         for(let i=0; i<encoded.length; i++) {
-            result += String.fromCharCode(encoded.charCodeAt(i) + key.charCodeAt(i % key.length));
+            // The % 256 keeps the math safely under Javascript's limit!
+            let cipherByte = (encoded.charCodeAt(i) + key.charCodeAt(i % key.length)) % 256;
+            result += String.fromCharCode(cipherByte);
         }
         return "E2E::" + btoa(result);
     }
@@ -217,12 +219,14 @@
             let raw = atob(text.substring(5));
             let result = '';
             for(let i=0; i<raw.length; i++) {
-                result += String.fromCharCode(raw.charCodeAt(i) - key.charCodeAt(i % key.length));
+                let plainByte = (raw.charCodeAt(i) - key.charCodeAt(i % key.length)) % 256;
+                if (plainByte < 0) plainByte += 256; // Fix for negative numbers
+                result += String.fromCharCode(plainByte);
             }
             return decodeURIComponent(escape(result));
         } catch(e) { return "🔐 [Encrypted Message]"; }
     }
-
+    
     window.addEventListener('DOMContentLoaded', () => {
         const savedSessionUser = localStorage.getItem('dipsum_logged_user');
         if (savedSessionUser && savedSessionUser.trim() !== "") {
@@ -488,11 +492,13 @@
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         
         let roomKey = [user, activeMomentAuthor].sort().join('#');
-        let securePayload = encryptE2E(replyText, roomKey);
-        let finalMessage = `[REPLY]📢 Moment Broadcast[/REPLY]` + securePayload;
+        
+        // --- FIX: Wrap the reply tag BEFORE encrypting the payload ---
+        let rawMessage = `[REPLY]📢 Moment Broadcast[/REPLY]` + replyText;
+        let securePayload = encryptE2E(rawMessage, roomKey);
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeMomentAuthor)}`, {
-            method: 'POST', headers: {'Content-Type': 'text/plain'}, body: finalMessage
+            method: 'POST', headers: {'Content-Type': 'text/plain'}, body: securePayload
         }).then(() => {
             document.getElementById('momentReplyInput').value = "";
             closeMomentViewer();
