@@ -22,7 +22,6 @@ public class Main {
     public static ConcurrentHashMap<String, String> userSubscriptions = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, Long> typingStatus = new ConcurrentHashMap<>();
 
-    // Smart Database Router: Protects local testing while using Railway volume in production
     private static final String DB_URL = (new java.io.File("/app/data").exists()) 
         ? "jdbc:sqlite:/app/data/chatlounge.db" 
         : "jdbc:sqlite:src/main/resources/chatlounge.db";
@@ -143,7 +142,28 @@ public class Main {
             if (finalResult.endsWith("$$$")) {
                 finalResult = finalResult.substring(0, finalResult.length() - 3);
             }
-            ctx.result(finalResult);
+            
+            // --- NEW: AUTO-CLEANING MOMENTS ENGINE ---
+            StringBuilder momentsData = new StringBuilder();
+            long cutoff = System.currentTimeMillis() - (24 * 60 * 60 * 1000L); 
+            try (Connection conn = DriverManager.getConnection(DB_URL)) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM moments WHERE timestamp < ?")) {
+                    ps.setLong(1, cutoff);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("SELECT username, targets FROM moments")) {
+                    ResultSet rs = ps.executeQuery();
+                    while (rs.next()) {
+                        String author = rs.getString("username");
+                        String targets = rs.getString("targets");
+                        if (author.equals(viewer) || targets.contains(viewer) || targets.equals("all")) {
+                            momentsData.append(author).append(",");
+                        }
+                    }
+                }
+            } catch (SQLException e) { }
+            
+            ctx.result(finalResult + "|||" + momentsData.toString());
         });
 
         app.post("/api/uploadProfilePic", ctx -> {
@@ -219,6 +239,7 @@ public class Main {
                         Subscription sub = new Gson().fromJson(subJsonFinal, Subscription.class);
 
                         String snippet = msgFinal.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Sent an image" : msgFinal;
+                        if (snippet.startsWith("E2E::")) snippet = "🔐 Encrypted Message";
                         if (snippet.length() > 60) snippet = snippet.substring(0, 60) + "...";
 
                         String payload = String.format(
@@ -343,7 +364,6 @@ public class Main {
             ctx.result(String.join("\n", outputData));
         });
 
-        // --- NEW: THE DEVELOPER ADMIN DELETION ROUTE ---
         app.get("/api/deleteUser", ctx -> {
             String admin = ctx.queryParam("admin");
             String target = ctx.queryParam("target");
@@ -359,22 +379,19 @@ public class Main {
                 return;
             }
 
-            // Wipe user from the permanent SQLite database
             try (Connection conn = DriverManager.getConnection(DB_URL)) {
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM users WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM profile_pics WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM connections WHERE user1 = ? OR user2 = ?")) { ps.setString(1, cleanTarget); ps.setString(2, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM moments WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE room_key LIKE ? OR room_key LIKE ?")) { 
                     ps.setString(1, cleanTarget + "#%"); 
                     ps.setString(2, "%#" + cleanTarget); 
                     ps.executeUpdate(); 
                 }
-            } catch (SQLException e) {
-                System.err.println("DB Delete Error: " + e.getMessage());
-            }
+            } catch (SQLException e) { System.err.println("DB Delete Error: " + e.getMessage()); }
 
-            // Wipe user from the active live memory
             userDatabase.remove(cleanTarget);
             userLastSeen.remove(cleanTarget);
             activeInvites.remove(cleanTarget);
@@ -387,6 +404,44 @@ public class Main {
             typingStatus.keySet().removeIf(key -> key.startsWith(cleanTarget + "#") || key.endsWith("#" + cleanTarget));
 
             ctx.result("DELETED");
+        });
+
+        // --- NEW: UPLOAD MOMENT (STATUS) ---
+        app.post("/api/uploadMoment", ctx -> {
+            String from = ctx.queryParam("from");
+            String targets = ctx.queryParam("targets");
+            String payload = ctx.body();
+            long timestamp = System.currentTimeMillis();
+
+            if (from != null && targets != null && !payload.isEmpty()) {
+                try (Connection conn = DriverManager.getConnection(DB_URL);
+                     PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO moments VALUES (?, ?, ?, ?)")) {
+                    ps.setString(1, from.trim().toLowerCase());
+                    ps.setString(2, targets.trim().toLowerCase());
+                    ps.setString(3, payload);
+                    ps.setLong(4, timestamp);
+                    ps.executeUpdate();
+                    ctx.result("SUCCESS");
+                } catch (SQLException e) { ctx.status(500).result("FAIL"); }
+            } else {
+                ctx.status(400).result("FAIL");
+            }
+        });
+
+        // --- NEW: VIEW MOMENT (STATUS) ---
+        app.get("/api/viewMoment", ctx -> {
+            String author = ctx.queryParam("author");
+            if (author == null) return;
+            try (Connection conn = DriverManager.getConnection(DB_URL);
+                 PreparedStatement ps = conn.prepareStatement("SELECT payload FROM moments WHERE username = ?")) {
+                ps.setString(1, author.trim().toLowerCase());
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    ctx.result(rs.getString("payload"));
+                    return;
+                }
+            } catch (SQLException e) { e.printStackTrace(); }
+            ctx.result("NONE");
         });
         
         String port = System.getenv("PORT");
@@ -405,6 +460,7 @@ public class Main {
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS moments (username TEXT PRIMARY KEY, targets TEXT, payload TEXT, timestamp INTEGER);");
 
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
 
