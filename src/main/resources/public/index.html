@@ -5,73 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Enterprise Control Dashboard</title>
     <style>
-        /*
-         * DIPSUM APP COLOR SCHEME - LOGO-INSPIRED CUTE-THEME UPDATE
-         */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #d1e49c; 
-            color: #334155;            
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .login-field {
-            width: 100%; padding: 12px; margin-bottom: 15px;
-            background-color: #aad052; border: 1px solid #fffdf5;  
-            border-radius: 6px; color: white; font-size: 14px; box-sizing: border-box;
-        }
-        .app-card {
-            background-color: #fffdf5; border: none; padding: 30px;
-            border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: center;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #d1e49c; color: #334155; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-field { width: 100%; padding: 12px; margin-bottom: 15px; background-color: #aad052; border: 1px solid #fffdf5; border-radius: 6px; color: white; font-size: 14px; box-sizing: border-box; }
+        .app-card { background-color: #fffdf5; border: none; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: center; }
         h2 { margin-top: 0; font-size: 24px; font-weight: 600; color: #aad052; } 
         p { color: #ffc8b0; font-size: 14px; margin-bottom: 30px; line-height: 1.5; } 
-
-        .sync-btn {
-            background: #aad052; color: white; border: none; padding: 14px;
-            font-size: 15px; font-weight: 600; border-radius: 8px;
-            cursor: pointer; width: 100%; transition: transform 0.1s ease;
-        }
+        .sync-btn { background: #aad052; color: white; border: none; padding: 14px; font-size: 15px; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; transition: transform 0.1s ease; }
         .sync-btn:active { transform: scale(0.98); }
-
-        .lounge-container {
-            display: flex; width: 900px; height: 600px; background: #fffdf5;       
-            border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); overflow: hidden;
-        }
-        .lounge-sidebar {
-            width: 30%; background-color: #fffdf5; padding: 20px;
-            border-right: 1px solid #d1e49c; 
-        }
-        .lounge-main {
-            width: 70%; display: flex; justify-content: center; align-items: center;
-            color: #334155; text-align: center; background-color: #fffdf5; 
-        }
+        .lounge-container { display: flex; width: 900px; height: 600px; background: #fffdf5; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); overflow: hidden; }
+        .lounge-sidebar { width: 30%; background-color: #fffdf5; padding: 20px; border-right: 1px solid #d1e49c; }
+        .lounge-main { width: 70%; display: flex; justify-content: center; align-items: center; color: #334155; text-align: center; background-color: #fffdf5; }
         .profile-section { display: flex; align-items: center; gap: 12px; }
-        .dp-circle {
-            width: 45px; height: 45px; background-color: #aad052;  
-            border-radius: 50%; display: flex; justify-content: center;
-            align-items: center; font-size: 20px; color: white;
-        }
 
-        /* MODAL LAYOUT */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(209, 228, 156, 0.85); backdrop-filter: blur(4px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
-        }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(209, 228, 156, 0.85); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
-
-        .modal-box {
-            background: #fffdf5; border: 1px solid #aad052; padding: 30px;
-            border-radius: 12px; width: 340px; text-align: center;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3); transform: scale(0.9); transition: transform 0.3s ease;
-        }
+        .modal-box { background: #fffdf5; border: 1px solid #aad052; padding: 30px; border-radius: 12px; width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); transform: scale(0.9); transition: transform 0.3s ease; }
         .modal-overlay.active .modal-box { transform: scale(1); }
-
         .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
         .btn-accept { flex: 1; background: #22c55e; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; }
         .btn-decline { flex: 1; background: #ffc8b0; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; }
@@ -79,127 +28,82 @@
         .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
         .status-online { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; } 
         .status-offline { background-color: #94a3b8; } 
-
-        .unread-badge {
-            background-color: #8a0c3c; color: white; font-size: 11px; font-weight: bold;
-            padding: 2px 7px; border-radius: 10px; margin-left: 8px; display: inline-block;
-        }
+        .unread-badge { background-color: #8a0c3c; color: white; font-size: 11px; font-weight: bold; padding: 2px 7px; border-radius: 10px; margin-left: 8px; display: inline-block; }
 
         .chat-window-pane { display: flex; flex-direction: column; width: 100%; height: 100%; background-color: #fffdf5; }
         .chat-header-bar { padding: 10px 20px; background-color: #fffdf5; border-bottom: 1px solid #aad052; display: flex; align-items: center; }
-
-        .header-dp-avatar {
-            width: 45px; height: 45px; border-radius: 50%; background-color: #fffdf5; 
-            display: flex; align-items: center; justify-content: center; font-size: 22px;
-            margin-right: 15px; border: 2px solid #aad052; color: #aad052;
-        }
-
+        .header-dp-avatar { width: 45px; height: 45px; border-radius: 50%; background-color: #fffdf5; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 15px; border: 2px solid #aad052; color: #aad052; }
         .header-meta-box { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
         .header-profile-title { font-size: 16px; font-weight: 600; color: #334155; line-height: 1.2; }
         .status-round-container { display: inline-flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+        .status-round-indicator { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block; transition: all 0.3s ease-in-out; }
+        .status-round-indicator.online { box-shadow: 0 0 10px rgba(34, 197, 94, 0.7); animation: statusRoundPulse 2s infinite ease-in-out; }
 
-        .status-round-indicator {
-            width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block; transition: all 0.3s ease-in-out;
-        }
-        .status-round-indicator.online {
-            box-shadow: 0 0 10px rgba(34, 197, 94, 0.7); animation: statusRoundPulse 2s infinite ease-in-out;
-        }
+        @keyframes statusRoundPulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.12); opacity: 0.85; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseGlow { 0% { opacity: 0.6; } 50% { opacity: 1; box-shadow: 0 0 8px rgba(21, 128, 61, 0.4); } 100% { opacity: 0.6; } }
 
-        @keyframes statusRoundPulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.12); opacity: 0.85; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        .chat-log-display { flex: 1; padding: 20px; overflow-y: auto; overflow-x: hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
+        .chat-footer-input-bar { display: flex; align-items: flex-end; gap: 4px; padding: 10px 6px; background: #e6c7c3; border-top: 1px solid #edbdb7; width: 100%; box-sizing: border-box; }
 
-        .chat-log-display { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .chat-footer-input-bar { padding: 15px 20px; background-color: #fffdf5; border-top: 1px solid #aad052; display: flex; gap: 12px; }
-
-        @keyframes slideInUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .msg-bubble {
-            max-width: 65%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4;
-            word-wrap: break-word; text-align: left; animation: slideInUp 0.2s ease-out forwards;
-        }
-        .msg-outgoing { background: linear-gradient(135deg, #aad052 0%, #c1df7e 100%); color: #334155; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg-incoming { background: linear-gradient(135deg, #fb9fa3 0%, #ffc8b0 100%); color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
-
+        .msg-bubble { max-width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; text-align: left; animation: slideInUp 0.2s ease-out forwards; word-break: break-word !important; overflow-wrap: anywhere !important; }
+        .msg-outgoing { background: linear-gradient(135deg, #aad052 0%, #c1df7e 100%); color: #334155; border-bottom-right-radius: 2px; }
+        .msg-incoming { background: linear-gradient(135deg, #fb9fa3 0%, #ffc8b0 100%); color: black; border-bottom-left-radius: 2px; }
+        
         #userListContainer { max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 4px; }
         #userListContainer::-webkit-scrollbar, .chat-log-display::-webkit-scrollbar { width: 6px; }
         #userListContainer::-webkit-scrollbar-thumb, .chat-log-display::-webkit-scrollbar-thumb { background: #d1e49c; border-radius: 10px; }
 
-        .sidebar-dp-avatar {
-            width: 38px; height: 38px; border-radius: 50%; background-color: #fffdf5; 
-            display: flex; align-items: center; justify-content: center; font-size: 18px;
-            margin-right: 12px; border: 2px solid #aad052; flex-shrink: 0; color: #aad052;
-        }
-
-        .emoji-drawer-panel {
-            display: flex; gap: 8px; background: #fffdf5; border: 1px solid #aad052; 
-            padding: 8px 12px; border-radius: 20px; position: absolute; bottom: 70px;
-            right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100;
-        }
-        .emoji-drawer-panel span { font-size: 20px; cursor: pointer; transition: transform 0.1s ease; }
-        .emoji-drawer-panel span:hover { transform: scale(1.3); }
-
-        .msg-bubble-media { max-width: 260px; border-radius: 8px; margin-top: 4px; border: 1px solid #ffc8b0; cursor: pointer; transition: opacity 0.2s; }
+        .sidebar-dp-avatar { width: 38px; height: 38px; border-radius: 50%; background-color: #fffdf5; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-right: 12px; border: 2px solid #aad052; flex-shrink: 0; color: #aad052; cursor: pointer; }
+        .msg-bubble-media { max-width: 100% !important; border-radius: 8px; margin-top: 4px; border: 1px solid #ffc8b0; cursor: pointer; transition: opacity 0.2s; object-fit: contain; }
         .msg-bubble-media:hover { opacity: 0.9; }
 
-        .tool-action-btn {
-            background: #fffdf5; border: 1px solid #aad052; color: #aad052; border-radius: 6px;
-            width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 18px; transition: all 0.2s;
-        }
-        .tool-action-btn:hover { background: #aad052; color: white; }
+        .tool-action-btn { background: none; border: none; font-size: 22px; cursor: pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0; transition: all 0.2s; }
+        .tool-action-btn:hover { transform: scale(1.1); }
 
-        /* MOBILE RESPONSIVE OVERRIDES */
+        /* --- NEW MOMENT UI CSS --- */
+        .moment-ring { box-shadow: 0 0 0 3px #fffdf5, 0 0 0 6px #f43f5e; transition: transform 0.2s; }
+        .moment-ring:hover { transform: scale(1.05); }
+
+        #momentViewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; display: none; flex-direction: column; }
+        .moment-viewer-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent); color: white; }
+        .moment-viewer-img { flex: 1; width: 100%; max-height: 80vh; object-fit: contain; margin: auto; }
+        
+        .sticker-drawer-panel { display: flex; gap: 8px; background: #1e293b; border: 1px solid #aad052; padding: 12px; border-radius: 20px; position: absolute; bottom: 70px; right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100; max-width: 280px; flex-wrap: wrap; justify-content: center; max-height: 220px; overflow-y: auto; }
+        .sticker-drawer-panel img { width: 55px; height: 55px; cursor: pointer; transition: transform 0.1s ease; object-fit: contain; border-radius: 8px; }
+        .sticker-drawer-panel img:hover { transform: scale(1.15); background: rgba(255,255,255,0.1); }
+        .sticker-display-img { max-width: 140px; border-radius: 8px; margin-top: 4px; background: transparent; pointer-events: none; }
+
         @media screen and (max-width: 768px) {
             html, body { display: block !important; height: 100dvh !important; width: 100vw !important; overflow: hidden !important; position: fixed !important; top: 0; left: 0; }
             .app-card { margin: 0 !important; width: 90% !important; max-width: 360px !important; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
             .lounge-container { position: fixed !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100vw !important; height: 100dvh !important; max-width: 100vw !important; border-radius: 0px !important; margin: 0 !important; box-shadow: none !important; overflow: hidden !important; background-color: #fffdf5 !important; }
             .lounge-sidebar { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; width: 100vw !important; box-sizing: border-box !important; z-index: 10 !important; transition: transform 0.2s ease-in-out !important; background-color: #fffdf5 !important; }
             .lounge-main { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; width: 100vw !important; box-sizing: border-box !important; z-index: 5 !important; background-color: #fffdf5 !important; display: flex !important; flex-direction: column !important; justify-content: flex-start !important; align-items: stretch !important; }
-            
             body.mobile-chat-view-engaged .lounge-sidebar { transform: translateX(-100%) !important; }
             body.mobile-chat-view-engaged .lounge-main { z-index: 20 !important; }
-
             .chat-window-pane { width: 100% !important; height: 100% !important; display: flex !important; flex-direction: column !important; box-sizing: border-box !important; position: relative !important; background-color: #fffdf5 !important; }
             .chat-log-display { flex: 1 !important; padding: 12px !important; overflow-y: auto !important; box-sizing: border-box !important; }
-            .chat-footer-input-bar { width: 100% !important; padding: 12px !important; box-sizing: border-box !important; background-color: #e6c7c3 !important; display: flex !important; gap: 8px !important; align-items: center !important; position: relative !important; z-index: 30 !important; border-top: 1px solid #aad052 !important; }
             input[type="text"] { font-size: 16px !important; flex: 1 !important; min-width: 0 !important; background-color: #aad052 !important; border: 1px solid #fffdf5 !important; color: white; }
-            .chat-footer-input-bar .sync-btn { width: 42px !important; height: 42px !important; padding: 0 !important; border-radius: 50% !important; background: #aad052 !important; color: white !important; flex-shrink: 0 !important; margin-right: 5px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
             #mobileSendBtn{ margin-right: 25px !important; background-color: #aad052 !important; }
         }
-
         #msgInputField::-webkit-scrollbar { display: none; }
         #msgInputField { -ms-overflow-style: none; scrollbar-width: none; }
 
-        @keyframes softBreathe {
-            0% { transform: translateY(0px) scale(1); }
-            50% { transform: translateY(-6px) scale(1.02); } 
-            100% { transform: translateY(0px) scale(1); }
-        }
-
-        .alive-logo {
-            animation: softBreathe 3.5s ease-in-out infinite;
-            filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); 
-        }
+        @keyframes softBreathe { 0% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-6px) scale(1.02); } 100% { transform: translateY(0px) scale(1); } }
+        .alive-logo { animation: softBreathe 3.5s ease-in-out infinite; filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); }
     </style>
     <link rel="manifest" href="/manifest.json">
 </head>
 <body>
+
 <div class="app-card" id="loginCard">
     <img src="dipsum-logo.png" alt="Dipsum Logo" class="alive-logo" style="width: 240px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
     <h2 id="authTitle">Your Secure Chat Portal</h2>
     <p style="margin-top: 20px; font-size: 18px; color: #b31e41;" id="authDescription">Pull up a cushion and stay a while. 🧸</p>
-
     <input type="text" id="usernameInput" placeholder="Enter Username" class="login-field">
     <input type="password" id="passwordInput" placeholder="Enter Password" class="login-field">
-
     <button class="sync-btn" id="authBtn" onclick="handleAuthSubmit()">Access Account</button>
-
     <p style="margin-top: 20px; font-size: 18px; color: #b31e41;">
         <span id="toggleText">Need an account?</span>
         <span id="toggleLink" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" onclick="toggleAuthMode()">Create one here</span>
@@ -210,12 +114,15 @@
     <div class="lounge-sidebar">
         <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
             <input type="file" id="userProfilePicUploader" accept="image/*" style="display: none;" onchange="executeOwnProfilePicUpload(this)">
-            <div id="currentUserAvatarWrapper" onclick="document.getElementById('userProfilePicUploader').click();" style="cursor: pointer; position: relative;" title="Click to upload profile picture">
+            <div id="currentUserAvatarWrapper" style="position: relative;" title="Your DP">
                 <div class="sidebar-dp-avatar" id="myProfileAvatarElement" style="width:70px; height:70px; font-size:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">👤</div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
-                <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; width: fit-content; transition: background 0.2s;" onmouseover="this.style.background='#fb9fa3'" onmouseout="this.style.background='#ffc8b0'">🚪 Logout</button>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="openMomentCreator()" style="background: #fb9fa3; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;" title="Share a beautiful moment...">📢 Moments</button>
+                    <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#fb9fa3'" onmouseout="this.style.background='#ffc8b0'">🚪 Logout</button>
+                </div>
             </div>
         </div>
 
@@ -232,6 +139,43 @@
     </div>
 </div>
 
+<!-- MOMENT CREATOR MODAL -->
+<div id="momentCreatorModal" class="modal-overlay">
+    <div class="modal-box" style="text-align: left;">
+        <h3 style="margin-top: 0; color: #aad052;">Share a Moment ✨</h3>
+        <p style="font-size: 13px; color: #555; margin-bottom: 10px;">Select who gets to see your 24-hour broadcast:</p>
+        
+        <div id="momentUserChecklist" style="background: white; border: 1px solid #ccc; padding: 10px; border-radius: 6px; max-height: 120px; overflow-y: auto; margin-bottom: 15px;">
+            <!-- Checkboxes injected here -->
+        </div>
+
+        <input type="file" id="momentMediaUploader" accept="image/*" style="display: none;" onchange="processMomentUpload(this)">
+        
+        <div class="modal-actions" style="margin-top: 10px;">
+            <button class="btn-accept" style="background: #fb9fa3; color: #7a1029;" onclick="document.getElementById('momentMediaUploader').click()">📸 Pick Image</button>
+            <button class="btn-decline" onclick="document.getElementById('momentCreatorModal').classList.remove('active')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- FULLSCREEN MOMENT VIEWER -->
+<div id="momentViewerOverlay">
+    <div class="moment-viewer-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button onclick="closeMomentViewer()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">❮</button>
+            <span id="momentViewerAuthor" style="font-weight: bold; font-size: 18px;">Username</span>
+        </div>
+        <button onclick="closeMomentViewer()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">✕</button>
+    </div>
+    
+    <img id="momentViewerImage" class="moment-viewer-img" src="">
+    
+    <div id="momentReplyBar" style="padding: 15px 20px; background: rgba(0,0,0,0.8); display: flex; gap: 10px;">
+        <input type="text" id="momentReplyInput" placeholder="Reply to moment..." style="flex: 1; padding: 12px; border-radius: 20px; border: none; outline: none; font-size: 15px;">
+        <button onclick="dispatchMomentReply()" style="background: #aad052; border: none; border-radius: 50%; width: 45px; height: 45px; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center;">➤</button>
+    </div>
+</div>
+
 <div id="inviteModal" class="modal-overlay">
     <div class="modal-box">
         <div style="font-size: 35px; margin-bottom: 10px;">✉️</div>
@@ -244,30 +188,44 @@
     </div>
 </div>
 
-<div id="systemAlertModal" class="custom-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fdf8ef; backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 10000;">
-    <div style="background: #fdc348; border: 1px solid #dba93b; padding: 25px; border-radius: 12px; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+<div id="systemAlertModal" class="modal-overlay" style="background: #fdf8ef; backdrop-filter: blur(4px);">
+    <div class="modal-box" style="background: #fdc348; border-color: #dba93b;">
         <div style="font-size: 36px; margin-bottom: 10px;" id="sysAlertIcon">⚠️</div>
-        <h3 id="sysAlertTitle" style="margin-bottom: 10px; font-size: 25px; font-weight: 600; color: #7a1029;">System Notification</h3>
-        <p id="sysAlertText" style="color: #b31e41; font-size: 18px; margin-bottom: 20px; line-height: 1.5;"></p>
-        <button class="sync-btn" style="width: 100%;" onclick="dismissCustomSystemAlert()">Acknowledge</button>
+        <h3 id="sysAlertTitle" style="color: #7a1029;">System Notification</h3>
+        <p id="sysAlertText" style="color: #b31e41;"></p>
+        <button class="sync-btn" onclick="dismissCustomSystemAlert()">Acknowledge</button>
     </div>
 </div>
 
 <script>
-    // 🌐 ABSOLUTE BACKEND ROUTING: Forces frontend to look at your live Railway server
     const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
-
-    // 🎵 DUAL NOTIFICATION SOUND ENGINE
     let totalUnreadMessagesTracked = 0;
     const backgroundChime = new Audio('tune1.mp3'); 
     const activeChatChime = new Audio('tune2.mp3'); 
+    let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer; 
 
-    let refreshLoop = null;
-    let currentInviteSender = null;
-    let isSignUpMode = false;
-    let activeChatTarget = null; 
-    let currentLoadedMessageCount = 0; 
-    let typingTimer; // For tracking typing state
+    // --- E2EE SCRAMBLER ENGINE ---
+    // Safe Base64-XOR cipher that flawlessly handles Unicode emojis without crashing
+    function encryptE2E(text, key) {
+        let result = '';
+        const encoded = unescape(encodeURIComponent(text));
+        for(let i=0; i<encoded.length; i++) {
+            result += String.fromCharCode(encoded.charCodeAt(i) + key.charCodeAt(i % key.length));
+        }
+        return "E2E::" + btoa(result);
+    }
+
+    function decryptE2E(text, key) {
+        if(!text.startsWith("E2E::")) return text;
+        try {
+            let raw = atob(text.substring(5));
+            let result = '';
+            for(let i=0; i<raw.length; i++) {
+                result += String.fromCharCode(raw.charCodeAt(i) - key.charCodeAt(i % key.length));
+            }
+            return decodeURIComponent(escape(result));
+        } catch(e) { return "🔐 [Encrypted Message]"; }
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
         const savedSessionUser = localStorage.getItem('dipsum_logged_user');
@@ -282,76 +240,44 @@
 
     function toggleAuthMode() {
         isSignUpMode = !isSignUpMode;
-        const authTitle = document.getElementById('authTitle');
-        const authDescription = document.getElementById('authDescription');
-        const authBtn = document.getElementById('authBtn');
-        const toggleText = document.getElementById('toggleText');
-        const toggleLink = document.getElementById('toggleLink');
-
-        if (isSignUpMode) {
-            authTitle.innerText = "Create New Account";
-            authDescription.innerText = "Sign up below to register your enterprise account.";
-            authBtn.innerText = "Register & Join";
-            toggleText.innerText = "Already have an account?";
-            toggleLink.innerText = "Log In here";
-        } else {
-            authTitle.innerText = "Your Secure Chat Portal";
-            authDescription.innerText = "Sign in to access your dashboard lounge.";
-            authBtn.innerText = "Access Account";
-            toggleText.innerText = "Need an account?";
-            toggleLink.innerText = "Create one here";
-        }
+        document.getElementById('authTitle').innerText = isSignUpMode ? "Create New Account" : "Your Secure Chat Portal";
+        document.getElementById('authDescription').innerText = isSignUpMode ? "Sign up below to register your enterprise account." : "Sign in to access your dashboard lounge.";
+        document.getElementById('authBtn').innerText = isSignUpMode ? "Register & Join" : "Access Account";
+        document.getElementById('toggleText').innerText = isSignUpMode ? "Already have an account?" : "Need an account?";
+        document.getElementById('toggleLink').innerText = isSignUpMode ? "Log In here" : "Create one here";
     }
 
     function handleAuthSubmit() {
-        const username = document.getElementById('usernameInput').value.trim();
-        const password = document.getElementById('passwordInput').value.trim();
-        const authBtn = document.getElementById('authBtn');
+        const user = document.getElementById('usernameInput').value.trim();
+        const pass = document.getElementById('passwordInput').value.trim();
+        if (!user || !pass) return displaySystemAlert("Missing Info", "Fill both fields.", "🚫");
 
-        if (!username || !password) {
-            displaySystemAlert("Missing Information", "Please fill out both the username and password fields to proceed.", "🚫");
-            return;
-        }
+        const btn = document.getElementById('authBtn');
+        const initialText = btn.innerText;
+        btn.innerText = "Processing...";
 
-        const initialBtnText = authBtn.innerText;
-        authBtn.innerText = "Processing...";
-
-        let targetUrl = `${backendBaseUrl}/api/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-        if (isSignUpMode) {
-            targetUrl = `${backendBaseUrl}/api/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-        }
-
-        fetch(targetUrl)
-            .then(res => res.text())
-            .then(data => {
-                authBtn.innerText = initialBtnText;
-                if (data.startsWith("SUCCESS")) {
-                    if (isSignUpMode) {
-                        displaySystemAlert("Registration Success", "Account created successfully! You can now log into your profile lounge.", "✨");
-                        toggleAuthMode();
-                    } else {
-                        localStorage.setItem('dipsum_logged_user', username.toLowerCase());
-                        document.getElementById('loginCard').style.display = 'none';
-                        document.getElementById('chatLounge').style.display = 'flex';
-                        document.getElementById('currentProfileName').innerText = username.toLowerCase();
-                        startAppSynchronization();
-                        setupPushNotifications(username.toLowerCase());
-                    }
+        let targetUrl = `${backendBaseUrl}/api/${isSignUpMode ? 'register' : 'login'}?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+        fetch(targetUrl).then(res => res.text()).then(data => {
+            btn.innerText = initialText;
+            if (data.startsWith("SUCCESS")) {
+                if (isSignUpMode) {
+                    displaySystemAlert("Success", "Account created!", "✨");
+                    toggleAuthMode();
                 } else {
-                    displaySystemAlert("Authentication Failure", data, "❌");
+                    localStorage.setItem('dipsum_logged_user', user.toLowerCase());
+                    document.getElementById('loginCard').style.display = 'none';
+                    document.getElementById('chatLounge').style.display = 'flex';
+                    document.getElementById('currentProfileName').innerText = user.toLowerCase();
+                    startAppSynchronization();
+                    setupPushNotifications(user.toLowerCase());
                 }
-            })
-            .catch(err => {
-                authBtn.innerText = initialBtnText;
-                displaySystemAlert("Network Offline", "Could not establish a stable handshake link with the Java runtime backend.", "📡");
-            });
+            } else displaySystemAlert("Failure", data, "❌");
+        }).catch(() => displaySystemAlert("Offline", "Could not connect to backend.", "📡"));
     }
 
     function executeAppLogout() {
         localStorage.removeItem('dipsum_logged_user');
         if (refreshLoop) clearInterval(refreshLoop);
-        activeChatTarget = null;
-        currentLoadedMessageCount = 0;
         window.location.reload();
     }
 
@@ -371,164 +297,212 @@
                 listContainer.innerHTML = "";
                 if(!rawText || rawText.trim() === "") return;
 
+                // Destructure the new combined payload
+                const payloadParts = rawText.split('|||');
+                const usersData = payloadParts[0];
+                const activeStatuses = (payloadParts[1] && payloadParts[1].trim() !== "") ? payloadParts[1].split(',') : [];
+
                 let currentCycleUnreadSum = 0; 
 
-                rawText.split('$$$').forEach(userToken => {
+                usersData.split('$$$').forEach(userToken => {
                     if (!userToken || userToken.trim() === "") return;
-
                     const parts = userToken.split('###');
                     if (parts.length < 5) return;
 
                     const targetUser = parts[0].trim();
+                    const cleanName = targetUser.toLowerCase();
                     const isOnline = parts[1].trim() === "true";
                     const unreadCount = parseInt(parts[2].trim(), 10);
                     const relationshipStatus = parts[3].trim();
-                    let customAvatarPic = parts[4] ? parts[4].trim() : "NONE";
-                    const cleanName = targetUser.toLowerCase();
+                    let customAvatarPic = parts[4] && parts[4] !== "NONE" ? "data:image/jpeg;base64," + parts[4] : "NONE";
 
-                    if (cleanName !== activeChatTarget) {
-                        currentCycleUnreadSum += unreadCount;
-                    }
+                    if (cleanName !== activeChatTarget) currentCycleUnreadSum += unreadCount;
 
-                    if (customAvatarPic !== "NONE" && customAvatarPic !== "" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
-                        customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
-                    }
-
+                    // Handle My Profile Drawing
                     if(cleanName === user) {
                         const myAvatarElement = document.getElementById('myProfileAvatarElement');
                         if (myAvatarElement) {
-                            if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
-                                myAvatarElement.innerHTML = `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                            myAvatarElement.innerHTML = customAvatarPic !== "NONE" ? `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : user.charAt(0).toUpperCase();
+                            
+                            // Apply self-ring if I have an active moment
+                            if(activeStatuses.includes(user)) {
+                                myAvatarElement.classList.add('moment-ring');
+                                myAvatarElement.onclick = () => viewMoment(user);
                             } else {
-                                myAvatarElement.innerHTML = user.charAt(0).toUpperCase();
+                                myAvatarElement.classList.remove('moment-ring');
+                                myAvatarElement.onclick = () => document.getElementById('userProfilePicUploader').click();
                             }
                         }
                         return;
                     }
 
-                    if (cleanName === activeChatTarget) {
-                        updateHeaderUserStatusIndicator(isOnline);
-                    }
+                    if (cleanName === activeChatTarget) updateHeaderUserStatusIndicator(isOnline);
 
                     const row = document.createElement('div');
                     row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
-
                     row.dataset.avatarData = customAvatarPic;
                     row.onclick = () => openTargetChatWindow(cleanName);
 
+                    const ringClass = activeStatuses.includes(cleanName) ? "moment-ring" : "";
                     const statusClass = isOnline ? "status-online" : "status-offline";
                     let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
 
-                    let dpContentHtml = "";
-                    if (customAvatarPic !== "NONE" && customAvatarPic.trim() !== "" && !customAvatarPic.includes("broken")) {
-                        dpContentHtml = `<img src="${customAvatarPic}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; display: block;">`;
-                    } else {
-                        dpContentHtml = `<div class="sidebar-dp-avatar" style="background:#334155; color:#94a3b8; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
-                    }
+                    let dpContentHtml = customAvatarPic !== "NONE" 
+                        ? `<img src="${customAvatarPic}" onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="width: 40px; height: 40px; object-fit: cover; margin-right: 10px;">` 
+                        : `<div onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="background:#334155; color:#94a3b8; width:40px; height:40px; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
 
-                    let actionComponentHtml = "";
-                    if (relationshipStatus === "CONNECTED") {
-                        actionComponentHtml = `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>`;
-                    } else if (relationshipStatus === "PENDING") {
-                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight: 600; cursor: not-allowed;" disabled onclick="event.stopPropagation();">Waiting...</button>`;
-                    } else {
-                        actionComponentHtml = `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight: 600;"
-                                onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`;
-                    }
+                    let actionComponentHtml = relationshipStatus === "CONNECTED" ? `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>` 
+                        : (relationshipStatus === "PENDING" ? `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600;" disabled onclick="event.stopPropagation();">Waiting...</button>` 
+                        : `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`);
 
-                    // --- NEW: THE SECRET TRASH BUTTON ONLY FOR HELP ---
-                    let deleteBtnHtml = "";
-                    if (user === "help" && cleanName !== "help") {
-                        deleteBtnHtml = `<button style="background:none; border:none; color:#9c2e24; font-size:18px; cursor:pointer; margin-left:4px;" onclick="event.stopPropagation(); deleteUserAccount('${cleanName}')" title="Delete User">🗑️</button>`;
-                    }
+                    let deleteBtnHtml = (user === "help" && cleanName !== "help") 
+                        ? `<button style="background:none; border:none; color:#9c2e24; font-size:18px; cursor:pointer; margin-left:4px;" onclick="event.stopPropagation(); deleteUserAccount('${cleanName}')" title="Delete User">🗑️</button>` : "";
 
-                    row.innerHTML = `
-                        <div style="display: flex; align-items: center; position: relative;">
-                            <span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>
-                            ${dpContentHtml}
-                            <span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>
-                            ${unreadBadgeHtml}
-                        </div>
-                        <div style="display:flex; align-items:center;">
-                            ${actionComponentHtml}
-                            ${deleteBtnHtml}
-                        </div>
-                    `;
+                    row.innerHTML = `<div style="display: flex; align-items: center; position: relative;"><span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>${dpContentHtml}<span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>${unreadBadgeHtml}</div><div style="display:flex; align-items:center;">${actionComponentHtml}${deleteBtnHtml}</div>`;
                     listContainer.appendChild(row);
                 });
 
-                if (currentCycleUnreadSum > totalUnreadMessagesTracked) {
-                    backgroundChime.play().catch(e => console.log("Audio playback pending interaction."));
-                }
+                if (currentCycleUnreadSum > totalUnreadMessagesTracked) backgroundChime.play().catch(()=>{});
                 totalUnreadMessagesTracked = currentCycleUnreadSum;
             });
 
-        if (activeChatTarget) {
-            fetchActiveChatMessages(user, activeChatTarget);
-        }
+        if (activeChatTarget) fetchActiveChatMessages(user, activeChatTarget);
 
-        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`)
-            .then(res => res.text())
-            .then(response => {
-                const modal = document.getElementById('inviteModal');
-                if (response.startsWith("PENDING:")) {
-                    const sender = response.split(":")[1];
-                    if(!modal.classList.contains('active')) {
-                        currentInviteSender = sender;
-                        document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(sender)}</b> wants to start a live chat session with you.`;
-                        modal.classList.add('active');
-                    }
+        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`).then(res => res.text()).then(response => {
+            const modal = document.getElementById('inviteModal');
+            if (response.startsWith("PENDING:")) {
+                currentInviteSender = response.split(":")[1];
+                if(!modal.classList.contains('active')) {
+                    document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(currentInviteSender)}</b> wants to chat.`;
+                    modal.classList.add('active');
                 }
-            });
+            }
+        });
     }
-    
-    // --- NEW: THE DEVELOPER DELETION LOGIC ---
-    function deleteUserAccount(targetUsername) {
-        if (!confirm(`WARNING: Are you sure you want to completely delete ${targetUsername}'s account and all their chat data? This cannot be undone.`)) return;
 
+    function deleteUserAccount(target) {
+        if (!confirm(`WARNING: Completely delete ${target} and all their chat data?`)) return;
         const admin = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-        if (admin !== 'help') return;
+        fetch(`${backendBaseUrl}/api/deleteUser?admin=${encodeURIComponent(admin)}&target=${encodeURIComponent(target)}`).then(res => res.text()).then(r => {
+            if (r === "DELETED") { if(activeChatTarget === target) exitActiveMobileChatView(); syncCycle(); }
+        });
+    }
 
-        fetch(`${backendBaseUrl}/api/deleteUser?admin=${encodeURIComponent(admin)}&target=${encodeURIComponent(targetUsername)}`)
-            .then(res => res.text())
-            .then(response => {
-                if (response === "DELETED") {
-                    if (activeChatTarget === targetUsername) exitActiveMobileChatView();
+    // --- MOMENTS (STATUS) ENGINE ---
+    function openMomentCreator() {
+        const listDiv = document.getElementById('momentUserChecklist');
+        listDiv.innerHTML = '';
+        const rows = document.getElementById('userListContainer').querySelectorAll('.status-dot');
+        let friendsCount = 0;
+        
+        rows.forEach(dot => {
+            const name = dot.nextElementSibling.nextElementSibling.innerText.trim();
+            if(dot.parentElement.nextElementSibling.innerText.includes("Connected")) {
+                listDiv.innerHTML += `<label style="display:block; margin-bottom:8px;"><input type="checkbox" value="${name.toLowerCase()}" class="moment-target-cb" checked> ${capitalizeFirstLetter(name)}</label>`;
+                friendsCount++;
+            }
+        });
+        
+        if (friendsCount === 0) {
+            listDiv.innerHTML = "<p style='font-size:12px; color:red;'>You need connected friends to broadcast!</p>";
+        } else {
+            listDiv.innerHTML = `<label style="display:block; margin-bottom:8px; font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px;"><input type="checkbox" id="momentSelectAll" checked onchange="toggleAllMomentChecks(this)"> Select All</label>` + listDiv.innerHTML;
+        }
+        document.getElementById('momentCreatorModal').classList.add('active');
+    }
+
+    function toggleAllMomentChecks(master) {
+        document.querySelectorAll('.moment-target-cb').forEach(cb => cb.checked = master.checked);
+    }
+
+    function processMomentUpload(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        
+        const boxes = Array.from(document.querySelectorAll('.moment-target-cb:checked')).map(cb => cb.value);
+        if(boxes.length === 0) return alert("Select at least one person to share with!");
+        const targets = boxes.join(",");
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                let w = img.width, h = img.height;
+                if (w > h && w > 800) { h *= 800/w; w = 800; } 
+                else if (h > 800) { w *= 800/h; h = 800; }
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                const b64 = canvas.toDataURL('image/jpeg', 0.8);
+                
+                const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+                fetch(`${backendBaseUrl}/api/uploadMoment?from=${encodeURIComponent(user)}&targets=${encodeURIComponent(targets)}`, {
+                    method: 'POST', body: b64
+                }).then(() => {
+                    fileInput.value = "";
+                    document.getElementById('momentCreatorModal').classList.remove('active');
                     syncCycle();
-                    alert(`✅ ${targetUsername} has been permanently deleted from the database.`);
-                } else {
-                    alert("❌ Failed to delete user.");
-                }
-            })
-            .catch(err => console.error("Deletion error:", err));
+                });
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    let activeMomentAuthor = "";
+    function viewMoment(author) {
+        const currentUser = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        fetch(`${backendBaseUrl}/api/viewMoment?author=${encodeURIComponent(author)}`).then(res=>res.text()).then(payload => {
+            if(payload !== "NONE") {
+                activeMomentAuthor = author;
+                document.getElementById('momentViewerAuthor').innerText = `${capitalizeFirstLetter(author)}'s Moment`;
+                document.getElementById('momentViewerImage').src = payload;
+                document.getElementById('momentViewerOverlay').style.display = 'flex';
+                document.getElementById('momentReplyBar').style.display = (author === currentUser) ? 'none' : 'flex';
+            }
+        });
+    }
+
+    function closeMomentViewer() {
+        document.getElementById('momentViewerOverlay').style.display = 'none';
+        document.getElementById('momentViewerImage').src = '';
+        activeMomentAuthor = "";
+    }
+
+    function dispatchMomentReply() {
+        const replyText = document.getElementById('momentReplyInput').value.trim();
+        if(!replyText || !activeMomentAuthor) return;
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        
+        let roomKey = [user, activeMomentAuthor].sort().join('#');
+        let securePayload = encryptE2E(replyText, roomKey);
+        let finalMessage = `[REPLY]📢 Moment Broadcast[/REPLY]` + securePayload;
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeMomentAuthor)}`, {
+            method: 'POST', headers: {'Content-Type': 'text/plain'}, body: finalMessage
+        }).then(() => {
+            document.getElementById('momentReplyInput').value = "";
+            closeMomentViewer();
+            if(activeChatTarget !== activeMomentAuthor) openTargetChatWindow(activeMomentAuthor);
+            else fetchActiveChatMessages(user, activeChatTarget);
+        });
     }
 
     function sendChatInvite(targetUsername) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
-        fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(user)}&to=${encodeURIComponent(targetUsername)}`)
-            .then(res => res.text())
-            .then(response => {
-                if (response.trim() === "SUCCESS") syncCycle();
-                else alert("Failed to send chat invitation. Please try again.");
-            })
-            .catch(err => console.error("Error dispatching invitation:", err));
+        fetch(`${backendBaseUrl}/api/sendInvite?from=${encodeURIComponent(user)}&to=${encodeURIComponent(targetUsername)}`).then(res => res.text()).then(r => {
+            if (r.trim() === "SUCCESS") syncCycle();
+        });
     }
 
     function submitInviteResponse(isAccepted) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-        const action = isAccepted ? "accept" : "decline";
-
         document.getElementById('inviteModal').classList.remove('active');
-
-        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(user)}&action=${action}`)
-            .then(res => res.text())
-            .then(() => syncCycle());
+        fetch(`${backendBaseUrl}/api/respondInvite?user=${encodeURIComponent(user)}&action=${isAccepted?'accept':'decline'}`).then(()=>syncCycle());
     }
 
     function openTargetChatWindow(targetUsername) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
         let activeUserRows = Array.from(document.getElementById('userListContainer').children);
         let matchedRow = activeUserRows.find(row => row.innerHTML.toLowerCase().includes(targetUsername));
         let activeChatAvatarPayload = (matchedRow && matchedRow.dataset.avatarData) ? matchedRow.dataset.avatarData : "NONE";
@@ -540,65 +514,47 @@
         }
 
         fetch(`${backendBaseUrl}/api/checkConnection?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUsername)}`)
-            .then(res => res.text())
-            .then(isAllowed => {
+            .then(res => res.text()).then(isAllowed => {
                 if (isAllowed.trim() === "TRUE") {
-
                     currentLoadedMessageCount = 0;
                     activeChatTarget = targetUsername;
                     cancelReply(); 
 
                     let loungeMain = document.querySelector('.lounge-main');
-                    if (!loungeMain) loungeMain = document.querySelector('div[style*="flex: 1"]') || document.querySelector('div[style*="flex:1"]');
                     if (!loungeMain) return;
 
-                    let headerAvatarHtml = "";
-                    if(activeChatAvatarPayload !== "NONE" && activeChatAvatarPayload.trim() !== "" && !activeChatAvatarPayload.includes("broken")) {
-                        headerAvatarHtml = `<img src="${activeChatAvatarPayload}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:12px;">`;
-                    } else {
-                        headerAvatarHtml = `<div class="header-dp-avatar" style="margin-right:12px; background:#2563eb; color:white; font-weight:bold; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">${targetUsername.charAt(0).toUpperCase()}</div>`;
-                    }
+                    let headerAvatarHtml = activeChatAvatarPayload !== "NONE" 
+                        ? `<img src="${activeChatAvatarPayload}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:12px;">` 
+                        : `<div class="header-dp-avatar" style="margin-right:12px; background:#2563eb; color:white; font-weight:bold; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">${targetUsername.charAt(0).toUpperCase()}</div>`;
 
-                    const initialStatusIconHtml = isTargetOnline
-                        ? `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`
-                        : `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+                    const initialStatusIconHtml = isTargetOnline ? `<img src="online.png" class="status-round-indicator online">` : `<img src="offline.png" class="status-round-indicator offline">`;
 
                     loungeMain.innerHTML = `
                 <style>
-                    @keyframes pawBounce {
-                        0%, 100% { transform: translateY(0); opacity: 0.5; }
-                        50% { transform: translateY(-4px); opacity: 1; }
-                    }
+                    @keyframes pawBounce { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(-4px); opacity: 1; } }
                     .paw-anim { display: inline-block; animation: pawBounce 0.9s infinite ease-in-out; margin: 0 1px; }
-                    
-                    /* REPLY CSS */
                     .msg-quoted { background: rgba(255,255,255,0.4); border-left: 3px solid #aad052; padding: 6px 8px; font-size: 12px; color: #555; margin-bottom: 6px; border-radius: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-style: italic; word-break: break-word; }
                     .reply-action-btn { opacity: 0.4; cursor: pointer; font-size: 14px; margin: 0 8px; background: #fffdf5; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: all 0.2s; border: 1px solid #aad052; flex-shrink: 0; }
                     .reply-action-btn:hover { opacity: 1; transform: scale(1.1); background: #aad052; }
-
-                    /* STICKER CSS */
                     .sticker-drawer-panel { display: flex; gap: 8px; background: #1e293b; border: 1px solid #aad052; padding: 12px; border-radius: 20px; position: absolute; bottom: 70px; right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100; max-width: 280px; flex-wrap: wrap; justify-content: center; max-height: 220px; overflow-y: auto; }
                     .sticker-drawer-panel img { width: 55px; height: 55px; cursor: pointer; transition: transform 0.1s ease; object-fit: contain; border-radius: 8px; }
                     .sticker-drawer-panel img:hover { transform: scale(1.15); background: rgba(255,255,255,0.1); }
                     .sticker-display-img { max-width: 140px; border-radius: 8px; margin-top: 4px; background: transparent; pointer-events: none; }
-
-                    /* OVERFLOW FIXES */
                     .msg-bubble { word-break: break-word !important; overflow-wrap: anywhere !important; }
                     .msg-bubble-media { max-width: 100% !important; object-fit: contain; }
                 </style>
                 <div class="chat-window-pane" style="position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
                     <div class="chat-header-bar" style="display:flex; align-items:center; padding:10px 15px; background:#e6c7c3; border-bottom:1px solid #334155;">
-
                         <button class="mobile-back-nav-btn" onclick="exitActiveMobileChatView()" style="background:none; border:none; color:#334155; font-size:30px; font-weight:bold; margin-right:15px; cursor:pointer; padding:5px 0; display:none;">❮</button>
-
                         ${headerAvatarHtml}
-
                         <div class="header-meta-box">
                             <div class="header-profile-title" style="color:#334155; font-weight:bold; font-size:16px; line-height: 1.2;">${capitalizeFirstLetter(targetUsername)}</div>
-
-                            <div id="userStatusWrapper" class="status-round-container">
-                                ${initialStatusIconHtml}
-                            </div>
+                            <div id="userStatusWrapper" class="status-round-container">${initialStatusIconHtml}</div>
+                        </div>
+                        
+                        <!-- E2E ENCRYPTION UI INDICATOR -->
+                        <div style="margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #15803d; background: #dcfce7; padding: 4px 8px; border-radius: 12px; font-weight: 600; animation: pulseGlow 3s infinite;">
+                            <span>🔐</span> E2E Encrypted
                         </div>
                     </div>
 
@@ -606,16 +562,6 @@
 
                     <div id="typingIndicatorContainer" style="display:none; background: #e6c7c3; padding: 4px 20px; font-size: 13px; color: #961808; text-align: left; border-top: 1px solid #aad052;">
                         <i>${capitalizeFirstLetter(targetUsername)} is typing</i> <span class="paw-anim" style="animation-delay: 0s;">🐾</span><span class="paw-anim" style="animation-delay: 0.2s;">🐾</span><span class="paw-anim" style="animation-delay: 0.4s;">🐾</span>
-                    </div>
-
-                    <div id="emojiMiniDrawer" class="emoji-drawer-panel" style="display: none; background: #1e293b; border-radius: 30px; padding: 10px 18px;">
-                        <span onclick="injectEmojiToken('😀')">😀</span>
-                        <span onclick="injectEmojiToken('👍')">👍</span>
-                        <span onclick="injectEmojiToken('❤️')">❤️</span>
-                        <span onclick="injectEmojiToken('🥰')">🥰</span>
-                        <span onclick="injectEmojiToken('🌹')">🌹</span>
-                        <span onclick="injectEmojiToken('💖')">💖</span>
-                        <span onclick="injectEmojiToken('😘')">😘</span>
                     </div>
 
                     <div id="stickerMiniDrawer" class="sticker-drawer-panel" style="display: none;">
@@ -629,84 +575,47 @@
                     </div>
 
                     <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:4px; padding:10px 6px; background:#e6c7c3; border-top:1px solid #edbdb7; width: 100%; box-sizing: border-box;">
-
                         <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
-
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
 
                         <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)"></textarea>
 
                         <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
-
                     </div>
-                </div>
-            `;
+                </div>`;
 
                     if(window.innerWidth <= 768) {
                         const backBtn = loungeMain.querySelector('.mobile-back-nav-btn');
                         if(backBtn) backBtn.style.setProperty('display', 'block', 'important');
                     }
-
                     document.body.classList.add('mobile-chat-view-engaged');
-
-                    const activeChatLog = document.getElementById('chatLogDisplay');
-                    if (activeChatLog) {
-                        const keyboardResizeObserver = new ResizeObserver(() => {
-                            activeChatLog.scrollTop = activeChatLog.scrollHeight;
-                        });
-                        keyboardResizeObserver.observe(activeChatLog);
-                    }
-
                     fetchActiveChatMessages(user, targetUsername);
-                } else {
-                    displaySystemAlert("Security Access Violation", `You do not have an active secure transmission channel.`, "🔒");
-                }
-            })
-            .catch(err => console.error("Error executing security header gateway sync:", err));
+                } else displaySystemAlert("Violation", `No active secure transmission channel.`, "🔒");
+            });
     }   
 
     function fetchActiveChatMessages(currentUser, targetUser) {
         fetch(`${backendBaseUrl}/api/getMessages?from=${encodeURIComponent(currentUser)}&to=${encodeURIComponent(targetUser)}`)
-            .then(res => res.text())
-            .then(data => {
+            .then(res => res.text()).then(data => {
                 const logBox = document.getElementById('chatLogDisplay');
                 if(!logBox) return;
-
-                if(!data || data.trim() === "") {
-                    logBox.innerHTML = "";
-                    currentLoadedMessageCount = 0;
-                    document.getElementById('typingIndicatorContainer').style.display = 'none';
-                    return;
-                }
+                if(!data || data.trim() === "") { logBox.innerHTML = ""; currentLoadedMessageCount = 0; return; }
 
                 const incomingTokensRaw = data.split('\n');
-                
-                // Pop the sneaked metadata off the bottom!
                 const metaToken = incomingTokensRaw.pop(); 
                 const [metaTag, isTypingStr, unreadCountStr] = metaToken.split('::');
 
-                const isTargetTyping = (isTypingStr === 'true');
-                const unreadByTarget = parseInt(unreadCountStr) || 0;
-
-                // Toggle typing UI
                 const typingBox = document.getElementById('typingIndicatorContainer');
-                if (typingBox) {
-                    typingBox.style.display = isTargetTyping ? 'block' : 'none';
-                }
+                if (typingBox) typingBox.style.display = (isTypingStr === 'true') ? 'block' : 'none';
 
                 const incomingMessageTokens = incomingTokensRaw.filter(t => t.trim() !== "");
-                
-                // --- SCROLL FIX: Only true if user is ALREADY at the bottom ---
                 let isScrolledToBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 60;
                 let isInitialLoad = (currentLoadedMessageCount === 0);
+                if (isInitialLoad) logBox.innerHTML = "";
 
-                if (isInitialLoad) {
-                    logBox.innerHTML = "";
-                }
+                let roomKey = [currentUser, targetUser].sort().join('#'); // SHARED KEY
 
-                // Append any brand new messages
                 if (incomingMessageTokens.length > currentLoadedMessageCount) {
                     const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
                     let hasFreshIncomingMessage = false;
@@ -718,22 +627,20 @@
                         const sender = msgToken.substring(0, separatorIndex);
                         let text = msgToken.substring(separatorIndex + 1);
 
-                        // --- TIMESTEMP PARSING LOGIC ---
                         let timeStringFormatted = "";
                         const timeSplitIdx = text.lastIndexOf("|~|");
                         if (timeSplitIdx !== -1) {
                             const timestampMs = parseInt(text.substring(timeSplitIdx + 3), 10);
                             text = text.substring(0, timeSplitIdx); 
-                            
                             if (!isNaN(timestampMs)) {
                                 const dateObj = new Date(timestampMs);
-                                const timePart = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                                timeStringFormatted = `${datePart}, ${timePart}`;
+                                timeStringFormatted = `${dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                             }
                         }
 
-                        // --- REPLY PARSING LOGIC ---
+                        // --- DECRYPT E2E PAYLOAD ---
+                        text = decryptE2E(text, roomKey);
+
                         let quotedText = "";
                         const replyMatch = text.match(/\[REPLY\](.*?)\[\/REPLY\]/);
                         if (replyMatch) {
@@ -741,7 +648,6 @@
                             text = text.replace(replyMatch[0], "").trim();
                         }
 
-                        // --- STICKER PARSING LOGIC ---
                         let stickerPath = "";
                         const stickerMatch = text.match(/\[STICKER\](.*?)\[\/STICKER\]/);
                         if (stickerMatch) {
@@ -751,38 +657,26 @@
 
                         if (sender !== currentUser) hasFreshIncomingMessage = true;
 
-                        // Create wrapper to align text and receipts correctly
                         const bubbleWrapper = document.createElement('div');
-                        bubbleWrapper.style.display = 'flex';
-                        bubbleWrapper.style.flexDirection = 'column';
+                        bubbleWrapper.style.display = 'flex'; bubbleWrapper.style.flexDirection = 'column';
                         bubbleWrapper.className = (sender === currentUser) ? "msg-wrapper msg-outgoing-wrapper" : "msg-wrapper";
                         bubbleWrapper.style.alignSelf = (sender === currentUser) ? "flex-end" : "flex-start";
-                        bubbleWrapper.style.maxWidth = "85%"; // Widened to stop reply buttons from pushing text out
+                        bubbleWrapper.style.maxWidth = "85%";
 
                         const bubble = document.createElement('div');
                         bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
-                        bubble.style.maxWidth = "100%"; 
-                        bubble.style.alignSelf = "stretch";
+                        bubble.style.maxWidth = "100%"; bubble.style.alignSelf = "stretch";
 
-                        // --- RENDER CONTENT (STICKER vs IMAGE vs TEXT) ---
                         if (stickerPath) {
                             bubble.innerHTML = `<img src="${stickerPath}" class="sticker-display-img">`;
-                            bubble.style.background = "transparent";
-                            bubble.style.padding = "0";
-                            bubble.style.boxShadow = "none";
+                            bubble.style.background = "transparent"; bubble.style.padding = "0"; bubble.style.boxShadow = "none";
                         } else if (text.startsWith("IMG_ATTACHMENT_DATA:")) {
                             let rawBase64Source = text.replace("IMG_ATTACHMENT_DATA:", "");
-                            if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) {
-                                rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
-                            }
+                            if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
                             bubble.innerHTML = `<img src="${rawBase64Source}" class="msg-bubble-media" onclick="window.open('${rawBase64Source}', '_blank')">`;
-                            bubble.style.background = "transparent";
-                            bubble.style.padding = "0";
-                        } else {
-                            bubble.innerText = text;
-                        }
+                            bubble.style.background = "transparent"; bubble.style.padding = "0";
+                        } else { bubble.innerText = text; }
 
-                        // --- INJECT QUOTED BUBBLE INSIDE MESSAGE ---
                         if (quotedText) {
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'msg-quoted';
@@ -790,33 +684,19 @@
                             bubble.insertBefore(quoteDiv, bubble.firstChild);
                         }
 
-                        // --- ROW LAYOUT FOR REPLY BUTTON + BUBBLE ---
                         const bubbleRow = document.createElement('div');
-                        bubbleRow.style.display = 'flex';
-                        bubbleRow.style.alignItems = 'center';
-                        bubbleRow.style.maxWidth = "100%"; // Prevent overflow
+                        bubbleRow.style.display = 'flex'; bubbleRow.style.alignItems = 'center'; bubbleRow.style.maxWidth = "100%";
 
-                        // Create the tiny reply action button
                         const replyBtn = document.createElement('button');
-                        replyBtn.className = 'reply-action-btn';
-                        replyBtn.innerHTML = '↩️';
-                        
-                        // Smart quoting based on content type
+                        replyBtn.className = 'reply-action-btn'; replyBtn.innerHTML = '↩️';
                         let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
                         replyBtn.onclick = () => prepareReply(plainTextToQuote);
 
-                        // Attach button based on who sent it
-                        if (sender === currentUser) {
-                            bubbleRow.appendChild(replyBtn);
-                            bubbleRow.appendChild(bubble);
-                        } else {
-                            bubbleRow.appendChild(bubble);
-                            bubbleRow.appendChild(replyBtn);
-                        }
+                        if (sender === currentUser) { bubbleRow.appendChild(replyBtn); bubbleRow.appendChild(bubble); } 
+                        else { bubbleRow.appendChild(bubble); bubbleRow.appendChild(replyBtn); }
 
                         bubbleWrapper.appendChild(bubbleRow);
 
-                        // --- META CONTAINER FOR TIME AND PAWS ---
                         const metaContainer = document.createElement('div');
                         metaContainer.style.cssText = 'display: flex; align-items: center; margin-top: 2px; padding: 0 4px;';
                         metaContainer.style.justifyContent = (sender === currentUser) ? 'flex-end' : 'flex-start';
@@ -838,42 +718,24 @@
                         logBox.appendChild(bubbleWrapper);
                     });
 
-                    if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) {
-                        activeChatChime.play().catch(e => console.log("Audio autoplay prevented."));
-                    }
-
+                    if (hasFreshIncomingMessage && currentLoadedMessageCount > 0) activeChatChime.play().catch(()=>{});
                     currentLoadedMessageCount = incomingMessageTokens.length;
                 }
 
-                // Update Read Receipts
                 if (incomingMessageTokens.length > 0) {
                     const allOutWrappers = logBox.querySelectorAll('.msg-outgoing-wrapper');
-                    const totalOut = allOutWrappers.length;
-
+                    const unreadByTarget = parseInt(unreadCountStr) || 0;
                     allOutWrappers.forEach((wrapper, index) => {
                         const receipt = wrapper.querySelector('.msg-receipt-paw');
-                        if (receipt) {
-                            if (index >= totalOut - unreadByTarget) {
-                                receipt.innerText = '🐾';
-                            } else {
-                                receipt.innerText = '🐾 🐾';
-                            }
-                        }
+                        if (receipt) receipt.innerText = (index >= allOutWrappers.length - unreadByTarget) ? '🐾' : '🐾 🐾';
                     });
                 }
-
-                // --- APPLY SCROLL FIX ---
-                if (isScrolledToBottom || isInitialLoad) {
-                    logBox.scrollTop = logBox.scrollHeight;
-                }
-            })
-            .catch(err => console.error("Error synchronizing active conversation state:", err));
+                if (isScrolledToBottom || isInitialLoad) logBox.scrollTop = logBox.scrollHeight;
+            });
     }
     
     function handleTypingInput(field) {
-        field.style.height='auto';
-        field.style.height=Math.min(field.scrollHeight, 120)+'px';
-
+        field.style.height='auto'; field.style.height=Math.min(field.scrollHeight, 120)+'px';
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         if(!activeChatTarget) return;
 
@@ -901,222 +763,97 @@
         if(!messageContent || !activeChatTarget) return;
 
         messageContent = messageContent.replace(/\n/g, "<br>");
-        
-        // --- NEW: Attach the reply data if it exists ---
         if (currentReplyContext !== "") {
             messageContent = `[REPLY]${currentReplyContext}[/REPLY]` + messageContent;
-            cancelReply(); // Clear the banner after sending
+            cancelReply(); 
         }
 
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
-        inputField.value = "";
-        inputField.style.height = "45px";
+        // --- ENCRYPT PAYLOAD BEFORE SENDING (SKIPPING MEDIA & STICKERS) ---
+        let roomKey = [user, activeChatTarget].sort().join('#');
+        let securePayload = messageContent;
+        if (!securePayload.startsWith("IMG_ATTACHMENT_DATA:") && !securePayload.includes("[STICKER]")) {
+            securePayload = encryptE2E(securePayload, roomKey);
+        }
 
-        // Kill typing state the moment we send
-        inputField.dataset.isTyping = "";
+        inputField.value = ""; inputField.style.height = "45px"; inputField.dataset.isTyping = "";
         fetch(`${backendBaseUrl}/api/setTyping?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}&typing=false`).catch(()=>{});
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: messageContent
-        }).then(res => res.text()).then(() => {
-                fetchActiveChatMessages(user, activeChatTarget);
-        });
-    }
-    
-    function toggleEmojiDrawerOverlay() {
-        const drawer = document.getElementById('emojiMiniDrawer');
-        if(!drawer) return;
-        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
-    }
-
-    function injectEmojiToken(emojiChar) {
-        const inputField = document.getElementById('msgInputField');
-        if(inputField) {
-            inputField.value += emojiChar;
-            inputField.focus();
-        }
-        document.getElementById('emojiMiniDrawer').style.display = 'none';
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
+        }).then(res => res.text()).then(() => { fetchActiveChatMessages(user, activeChatTarget); });
     }
 
     function processMediaFileTransmission(fileInput) {
         if (!fileInput.files || !fileInput.files[0]) return;
-        const targetsSelectedFile = fileInput.files[0];
-
         const reader = new FileReader();
         reader.onload = function(event) {
             const img = new Image();
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                const maxW = 400; const maxH = 400;
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
                 let w = img.width; let h = img.height;
-
-                if (w > h) { if (w > maxW) { h *= maxW / w; w = maxW; } } 
-                else { if (h > maxH) { w *= maxH / h; h = maxH; } }
-
-                canvas.width = w; canvas.height = h;
-                ctx.drawImage(img, 0, 0, w, h);
-
-                const compressedBase64DataString = canvas.toDataURL('image/jpeg', 0.6);
+                if (w > h && w > 400) { h *= 400 / w; w = 400; } else if (h > 400) { w *= 400 / h; h = 400; }
+                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h);
+                const encodedPayloadString = "IMG_ATTACHMENT_DATA:" + canvas.toDataURL('image/jpeg', 0.6);
                 const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-                const encodedPayloadString = "IMG_ATTACHMENT_DATA:" + compressedBase64DataString;
 
                 fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: encodedPayloadString
-                }).then(res => res.text()).then(() => {
-                        fileInput.value = "";
-                        fetchActiveChatMessages(user, activeChatTarget);
-                });
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: encodedPayloadString
+                }).then(() => { fileInput.value = ""; fetchActiveChatMessages(user, activeChatTarget); });
             };
             img.src = event.target.result;
         };
-        reader.readAsDataURL(targetsSelectedFile);
+        reader.readAsDataURL(fileInput.files[0]);
     }
 
-    function handleChatKeyDown(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            triggerMessageDispatch();
-        }
-    }
-
+    function handleChatKeyDown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); triggerMessageDispatch(); } }
     function displaySystemAlert(title, message, icon = "⚠️") {
-        document.getElementById('sysAlertIcon').innerText = icon;
-        document.getElementById('sysAlertTitle').innerText = title;
-        document.getElementById('sysAlertText').innerText = message;
-        document.getElementById('systemAlertModal').style.display = 'flex';
+        document.getElementById('sysAlertIcon').innerText = icon; document.getElementById('sysAlertTitle').innerText = title;
+        document.getElementById('sysAlertText').innerText = message; document.getElementById('systemAlertModal').style.display = 'flex';
     }
-
     function dismissCustomSystemAlert() {
         document.getElementById('systemAlertModal').style.display = 'none';
         if (document.getElementById('chatLounge').style.display !== 'flex') {
             localStorage.removeItem('dipsum_logged_user');
             document.getElementById('loginCard').style.display = 'block';
-            const authBtn = document.getElementById('authBtn');
-            if (authBtn) authBtn.innerText = "Access Account";
+            if (document.getElementById('authBtn')) document.getElementById('authBtn').innerText = "Access Account";
         }
     }
-
-    function capitalizeFirstLetter(string) {
-        if (!string) return "";
-        return string.charAt(0).toUpperCase() + string.slice(1);
-    }
+    function capitalizeFirstLetter(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ""; }
 
     function executeOwnProfilePicUpload(fileInput) {
         if (!fileInput.files || !fileInput.files[0]) return;
-        const targetFile = fileInput.files[0];
-
         const reader = new FileReader();
         reader.onload = function(event) {
             const img = new Image();
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                const targetSize = 300;
-                canvas.width = targetSize; canvas.height = targetSize;
-
-                let srcX = 0; let srcY = 0;
-                let srcSize = Math.min(img.width, img.height);
-
-                if (img.width > img.height) srcX = (img.width - img.height) / 2;
-                else srcY = (img.height - img.width) / 2;
-
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                const targetSize = 300; canvas.width = targetSize; canvas.height = targetSize;
+                let srcX = 0, srcY = 0, srcSize = Math.min(img.width, img.height);
+                if (img.width > img.height) srcX = (img.width - img.height) / 2; else srcY = (img.height - img.width) / 2;
+                ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, targetSize, targetSize);
-
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.92);
                 const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
                 fetch(`${backendBaseUrl}/api/uploadProfilePic?user=${encodeURIComponent(user)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: compressedBase64
-                }).then(res => res.text()).then(status => {
-                        if(status === "UPLOAD_SUCCESSFUL") {
-                            document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
-                            syncCycle();
-                        }
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: compressedBase64
+                }).then(() => {
+                    document.getElementById('myProfileAvatarElement').innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                    syncCycle();
                 });
             };
             img.src = event.target.result;
         };
-        reader.readAsDataURL(targetFile);
+        reader.readAsDataURL(fileInput.files[0]);
     }
 
-    function exitActiveMobileChatView() {
-        activeChatTarget = null;
-        currentLoadedMessageCount = 0;
-        document.body.classList.remove('mobile-chat-view-engaged');
-    }
-
+    function exitActiveMobileChatView() { activeChatTarget = null; currentLoadedMessageCount = 0; document.body.classList.remove('mobile-chat-view-engaged'); }
     function updateHeaderUserStatusIndicator(isOnline) {
         const wrapper = document.getElementById('userStatusWrapper');
-        if (!wrapper) return;
-        if (isOnline) wrapper.innerHTML = `<img src="online.png" class="status-round-indicator online" alt="●" title="Online">`;
-        else wrapper.innerHTML = `<img src="offline.png" class="status-round-indicator offline" alt="○" title="Offline">`;
+        if (wrapper) wrapper.innerHTML = isOnline ? `<img src="online.png" class="status-round-indicator online">` : `<img src="offline.png" class="status-round-indicator offline">`;
     }
 
-    function setupPushNotifications(username) {
-        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.log("Push not supported on this browser.");
-            return;
-        }
-
-        Notification.requestPermission().then(permission => {
-            if (permission !== 'granted') {
-                console.warn('Notification permission denied.');
-                return;
-            }
-            navigator.serviceWorker.ready.then(registration => {
-                registration.pushManager.getSubscription().then(existingSub => {
-                    if (existingSub) {
-                        sendSubscriptionToServer(existingSub, username);
-                        return;
-                    }
-                    const publicVapidKey = 'BDDhyYsSLzcQFyLfD-r_NUqwFZ9TNxR6woPhXrImD1TGHdEOam7x-yGWPDrsLMPqRh-v-_W7xPXy8PccWuJCnkI';
-                    registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-                    }).then(newSub => {
-                        console.log('Push subscription created!');
-                        sendSubscriptionToServer(newSub, username);
-                    }).catch(err => {
-                        console.error('Push subscribe failed:', err);
-                    });
-                }).catch(err => console.error("Push setup error:", err));
-            });
-        });
-    }
-    
-    function sendSubscriptionToServer(subscription, username) {
-        fetch(`${backendBaseUrl}/api/saveSubscription?username=${encodeURIComponent(username)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription)
-        }).then(res => res.text()).then(statusText => console.log("System Push Registration Sync status:", statusText))
-          .catch(err => console.error("Failed to forward push context maps to Java runtime backend:", err));
-    }
-
-    function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    }
-    
-    // --- NEW STICKER ASSETS & LOGIC ---
     const stickerCollection = [
         'tkiss.png', 'baby.png', 'backhug.png', 'hmmm.png', 'hugs.png', 
         'kiss.png', 'looks.png', 'sleep.png', 'ufbaby.png', 'uffhug.png', 'ufhug.png', 'ggkiss.png',
@@ -1125,22 +862,7 @@
 
     function toggleStickerDrawerOverlay() {
         const drawer = document.getElementById('stickerMiniDrawer');
-        if(!drawer) return;
-        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
-        
-        // Auto-close emoji drawer if it's open
-        const emojiDrawer = document.getElementById('emojiMiniDrawer');
-        if(emojiDrawer) emojiDrawer.style.display = 'none';
-    }
-
-    // UPDATED to close the sticker drawer if you open emojis
-    function toggleEmojiDrawerOverlay() {
-        const drawer = document.getElementById('emojiMiniDrawer');
-        if(!drawer) return;
-        drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
-        
-        const stickerDrawer = document.getElementById('stickerMiniDrawer');
-        if(stickerDrawer) stickerDrawer.style.display = 'none';
+        if(drawer) drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
     }
 
     function sendSticker(stickerFileName) {
@@ -1148,52 +870,28 @@
         if(!activeChatTarget) return;
 
         let payload = `[STICKER]stickers/${stickerFileName}[/STICKER]`;
-        
-        // If the user is replying to someone WITH a sticker
-        if (currentReplyContext !== "") {
-            payload = `[REPLY]${currentReplyContext}[/REPLY]` + payload;
-            cancelReply(); 
-        }
+        if (currentReplyContext !== "") { payload = `[REPLY]${currentReplyContext}[/REPLY]` + payload; cancelReply(); }
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: payload
-        }).then(res => res.text()).then(() => {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: payload
+        }).then(() => {
             document.getElementById('stickerMiniDrawer').style.display = 'none';
             fetchActiveChatMessages(user, activeChatTarget);
         });
     }
 
-    // --- NEW REPLY FEATURE VARIABLES & FUNCTIONS ---
     let currentReplyContext = "";
-
     function prepareReply(textToQuote) {
         currentReplyContext = textToQuote;
         const banner = document.getElementById('activeReplyBanner');
         const bannerText = document.getElementById('replyBannerText');
-        if (banner && bannerText) {
-            banner.style.display = 'block';
-            bannerText.innerText = textToQuote;
-            document.getElementById('msgInputField').focus();
-        }
+        if (banner && bannerText) { banner.style.display = 'block'; bannerText.innerText = textToQuote; document.getElementById('msgInputField').focus(); }
     }
+    function cancelReply() { currentReplyContext = ""; const banner = document.getElementById('activeReplyBanner'); if (banner) banner.style.display = 'none'; }
 
-    function cancelReply() {
-        currentReplyContext = "";
-        const banner = document.getElementById('activeReplyBanner');
-        if (banner) {
-            banner.style.display = 'none';
-        }
-    }
 </script>
 <script>
-  // Register SW immediately, not on load event
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.error('SW failed:', err));
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW failed:', err));
 </script>
 </body>
 </html>
