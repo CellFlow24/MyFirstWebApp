@@ -61,7 +61,7 @@
         .tool-action-btn { background: none; border: none; font-size: 22px; cursor: pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0; transition: all 0.2s; }
         .tool-action-btn:hover { transform: scale(1.1); }
 
-        /* --- NEW MOMENT UI CSS --- */
+        /* --- MOMENT UI CSS --- */
         .moment-ring { box-shadow: 0 0 0 3px #fffdf5, 0 0 0 6px #f43f5e; transition: transform 0.2s; }
         .moment-ring:hover { transform: scale(1.05); }
 
@@ -139,15 +139,13 @@
     </div>
 </div>
 
-<!-- MOMENT CREATOR MODAL -->
 <div id="momentCreatorModal" class="modal-overlay">
     <div class="modal-box" style="text-align: left;">
         <h3 style="margin-top: 0; color: #aad052;">Share a Moment ✨</h3>
         <p style="font-size: 13px; color: #555; margin-bottom: 10px;">Select who gets to see your 24-hour broadcast:</p>
         
         <div id="momentUserChecklist" style="background: white; border: 1px solid #ccc; padding: 10px; border-radius: 6px; max-height: 120px; overflow-y: auto; margin-bottom: 15px;">
-            <!-- Checkboxes injected here -->
-        </div>
+            </div>
 
         <input type="file" id="momentMediaUploader" accept="image/*" style="display: none;" onchange="processMomentUpload(this)">
         
@@ -158,7 +156,6 @@
     </div>
 </div>
 
-<!-- FULLSCREEN MOMENT VIEWER -->
 <div id="momentViewerOverlay">
     <div class="moment-viewer-header">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -202,10 +199,9 @@
     let totalUnreadMessagesTracked = 0;
     const backgroundChime = new Audio('tune1.mp3'); 
     const activeChatChime = new Audio('tune2.mp3'); 
-    let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer; 
+    let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer, lastSyncPayload = ""; 
 
     // --- E2EE SCRAMBLER ENGINE ---
-    // Safe Base64-XOR cipher that flawlessly handles Unicode emojis without crashing
     function encryptE2E(text, key) {
         let result = '';
         const encoded = unescape(encodeURIComponent(text));
@@ -292,75 +288,92 @@
         fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
             .then(res => res.text())
             .then(rawText => {
-                const listContainer = document.getElementById('userListContainer');
-                if (!listContainer) return;
-                listContainer.innerHTML = "";
                 if(!rawText || rawText.trim() === "") return;
 
-                // Destructure the new combined payload
+                // --- FLICKER FIX: Skip UI rebuilding if the exact same data arrives ---
+                let dataChanged = (rawText !== lastSyncPayload);
+                lastSyncPayload = rawText;
+
                 const payloadParts = rawText.split('|||');
                 const usersData = payloadParts[0];
                 const activeStatuses = (payloadParts[1] && payloadParts[1].trim() !== "") ? payloadParts[1].split(',') : [];
 
                 let currentCycleUnreadSum = 0; 
 
-                usersData.split('$$$').forEach(userToken => {
-                    if (!userToken || userToken.trim() === "") return;
-                    const parts = userToken.split('###');
-                    if (parts.length < 5) return;
+                if (dataChanged) {
+                    const listContainer = document.getElementById('userListContainer');
+                    if (listContainer) listContainer.innerHTML = "";
+                    
+                    usersData.split('$$$').forEach(userToken => {
+                        if (!userToken || userToken.trim() === "") return;
+                        const parts = userToken.split('###');
+                        if (parts.length < 5) return;
 
-                    const targetUser = parts[0].trim();
-                    const cleanName = targetUser.toLowerCase();
-                    const isOnline = parts[1].trim() === "true";
-                    const unreadCount = parseInt(parts[2].trim(), 10);
-                    const relationshipStatus = parts[3].trim();
-                    let customAvatarPic = parts[4] && parts[4] !== "NONE" ? "data:image/jpeg;base64," + parts[4] : "NONE";
-
-                    if (cleanName !== activeChatTarget) currentCycleUnreadSum += unreadCount;
-
-                    // Handle My Profile Drawing
-                    if(cleanName === user) {
-                        const myAvatarElement = document.getElementById('myProfileAvatarElement');
-                        if (myAvatarElement) {
-                            myAvatarElement.innerHTML = customAvatarPic !== "NONE" ? `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : user.charAt(0).toUpperCase();
-                            
-                            // Apply self-ring if I have an active moment
-                            if(activeStatuses.includes(user)) {
-                                myAvatarElement.classList.add('moment-ring');
-                                myAvatarElement.onclick = () => viewMoment(user);
-                            } else {
-                                myAvatarElement.classList.remove('moment-ring');
-                                myAvatarElement.onclick = () => document.getElementById('userProfilePicUploader').click();
-                            }
+                        const targetUser = parts[0].trim();
+                        const cleanName = targetUser.toLowerCase();
+                        const isOnline = parts[1].trim() === "true";
+                        const unreadCount = parseInt(parts[2].trim(), 10);
+                        const relationshipStatus = parts[3].trim();
+                        
+                        // --- DP FIX: Prevent double URL strings causing broken images ---
+                        let customAvatarPic = parts[4] && parts[4].trim() !== "NONE" ? parts[4].trim() : "NONE";
+                        if (customAvatarPic !== "NONE" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
+                            customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
                         }
-                        return;
-                    }
 
-                    if (cleanName === activeChatTarget) updateHeaderUserStatusIndicator(isOnline);
+                        if (cleanName !== activeChatTarget) currentCycleUnreadSum += unreadCount;
 
-                    const row = document.createElement('div');
-                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
-                    row.dataset.avatarData = customAvatarPic;
-                    row.onclick = () => openTargetChatWindow(cleanName);
+                        if(cleanName === user) {
+                            const myAvatarElement = document.getElementById('myProfileAvatarElement');
+                            if (myAvatarElement) {
+                                myAvatarElement.innerHTML = customAvatarPic !== "NONE" ? `<img src="${customAvatarPic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : user.charAt(0).toUpperCase();
+                                
+                                if(activeStatuses.includes(user)) {
+                                    myAvatarElement.classList.add('moment-ring');
+                                    myAvatarElement.onclick = () => viewMoment(user);
+                                } else {
+                                    myAvatarElement.classList.remove('moment-ring');
+                                    myAvatarElement.onclick = () => document.getElementById('userProfilePicUploader').click();
+                                }
+                            }
+                            return;
+                        }
 
-                    const ringClass = activeStatuses.includes(cleanName) ? "moment-ring" : "";
-                    const statusClass = isOnline ? "status-online" : "status-offline";
-                    let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
+                        if (cleanName === activeChatTarget) updateHeaderUserStatusIndicator(isOnline);
 
-                    let dpContentHtml = customAvatarPic !== "NONE" 
-                        ? `<img src="${customAvatarPic}" onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="width: 40px; height: 40px; object-fit: cover; margin-right: 10px;">` 
-                        : `<div onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="background:#334155; color:#94a3b8; width:40px; height:40px; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
+                        const row = document.createElement('div');
+                        row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
+                        row.dataset.avatarData = customAvatarPic;
+                        row.onclick = () => openTargetChatWindow(cleanName);
 
-                    let actionComponentHtml = relationshipStatus === "CONNECTED" ? `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>` 
-                        : (relationshipStatus === "PENDING" ? `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600;" disabled onclick="event.stopPropagation();">Waiting...</button>` 
-                        : `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`);
+                        const ringClass = activeStatuses.includes(cleanName) ? "moment-ring" : "";
+                        const statusClass = isOnline ? "status-online" : "status-offline";
+                        let unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : "";
 
-                    let deleteBtnHtml = (user === "help" && cleanName !== "help") 
-                        ? `<button style="background:none; border:none; color:#9c2e24; font-size:18px; cursor:pointer; margin-left:4px;" onclick="event.stopPropagation(); deleteUserAccount('${cleanName}')" title="Delete User">🗑️</button>` : "";
+                        let dpContentHtml = customAvatarPic !== "NONE" 
+                            ? `<img src="${customAvatarPic}" onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="width: 40px; height: 40px; object-fit: cover; margin-right: 10px;">` 
+                            : `<div onclick="event.stopPropagation(); if('${ringClass}') viewMoment('${cleanName}')" class="sidebar-dp-avatar ${ringClass}" style="background:#334155; color:#94a3b8; width:40px; height:40px; margin-right:10px;">${targetUser.charAt(0).toUpperCase()}</div>`;
 
-                    row.innerHTML = `<div style="display: flex; align-items: center; position: relative;"><span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>${dpContentHtml}<span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>${unreadBadgeHtml}</div><div style="display:flex; align-items:center;">${actionComponentHtml}${deleteBtnHtml}</div>`;
-                    listContainer.appendChild(row);
-                });
+                        let actionComponentHtml = relationshipStatus === "CONNECTED" ? `<span style="color: #22c55e; font-weight: 600; font-size: 14px; padding: 6px 12px;">✓ Connected</span>` 
+                            : (relationshipStatus === "PENDING" ? `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600;" disabled onclick="event.stopPropagation();">Waiting...</button>` 
+                            : `<button style="background:#febeb9; border:none; color:#9c2e24; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); sendChatInvite('${cleanName}')">Invite</button>`);
+
+                        let deleteBtnHtml = (user === "help" && cleanName !== "help") 
+                            ? `<button style="background:none; border:none; color:#9c2e24; font-size:18px; cursor:pointer; margin-left:4px;" onclick="event.stopPropagation(); deleteUserAccount('${cleanName}')" title="Delete User">🗑️</button>` : "";
+
+                        row.innerHTML = `<div style="display: flex; align-items: center; position: relative;"><span class="status-dot ${statusClass}" style="position: absolute; bottom: 0; left: 28px; z-index: 10; border: 2px solid #334155;"></span>${dpContentHtml}<span style="font-weight: 500; color: #334155;">${capitalizeFirstLetter(targetUser)}</span>${unreadBadgeHtml}</div><div style="display:flex; align-items:center;">${actionComponentHtml}${deleteBtnHtml}</div>`;
+                        if (listContainer) listContainer.appendChild(row);
+                    });
+                } else {
+                    usersData.split('$$$').forEach(userToken => {
+                        if (!userToken || userToken.trim() === "") return;
+                        const parts = userToken.split('###');
+                        if (parts.length < 5) return;
+                        const cleanName = parts[0].trim().toLowerCase();
+                        const unreadCount = parseInt(parts[2].trim(), 10);
+                        if (cleanName !== activeChatTarget && cleanName !== user) currentCycleUnreadSum += unreadCount;
+                    });
+                }
 
                 if (currentCycleUnreadSum > totalUnreadMessagesTracked) backgroundChime.play().catch(()=>{});
                 totalUnreadMessagesTracked = currentCycleUnreadSum;
@@ -388,7 +401,7 @@
         });
     }
 
-    // --- MOMENTS (STATUS) ENGINE ---
+    // --- MOMENTS ENGINE ---
     function openMomentCreator() {
         const listDiv = document.getElementById('momentUserChecklist');
         listDiv.innerHTML = '';
@@ -552,7 +565,6 @@
                             <div id="userStatusWrapper" class="status-round-container">${initialStatusIconHtml}</div>
                         </div>
                         
-                        <!-- E2E ENCRYPTION UI INDICATOR -->
                         <div style="margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #15803d; background: #dcfce7; padding: 4px 8px; border-radius: 12px; font-weight: 600; animation: pulseGlow 3s infinite;">
                             <span>🔐</span> E2E Encrypted
                         </div>
