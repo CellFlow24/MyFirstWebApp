@@ -92,6 +92,45 @@
 
         @keyframes softBreathe { 0% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-6px) scale(1.02); } 100% { transform: translateY(0px) scale(1); } }
         .alive-logo { animation: softBreathe 3.5s ease-in-out infinite; filter: drop-shadow(0 8px 15px rgba(170, 208, 82, 0.3)); }
+        /* --- NEW: MESSAGE HIGHLIGHT ANIMATION --- */
+        @keyframes messageHighlightAnimation {
+            0% { background: #fef08a; transform: scale(1.02); box-shadow: 0 0 15px #fef08a; }
+            100% { transform: scale(1); box-shadow: none; }
+        }
+        .msg-highlight-active {
+            animation: messageHighlightAnimation 1.5s ease-out-of-bound;
+        }
+
+        /* --- NEW: FLOATING SCROLL TO BOTTOM BUTTON --- */
+        .scroll-bottom-btn {
+            position: absolute;
+            bottom: 75px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background-color: #aad052;
+            color: white;
+            border: 2px solid #fffdf5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 99;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.2s ease;
+        }
+        .scroll-bottom-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .scroll-bottom-btn:hover {
+            transform: scale(1.1);
+            background-color: #9ec246;
+        }
     </style>
     <link rel="manifest" href="/manifest.json">
 </head>
@@ -552,11 +591,10 @@
                 <style>
                     @keyframes pawBounce { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(-4px); opacity: 1; } }
                     .paw-anim { display: inline-block; animation: pawBounce 0.9s infinite ease-in-out; margin: 0 1px; }
-                    .msg-quoted { background: rgba(255,255,255,0.4); border-left: 3px solid #aad052; padding: 6px 8px; font-size: 12px; color: #555; margin-bottom: 6px; border-radius: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-style: italic; word-break: break-word; }
+                    .msg-quoted { background: rgba(255,255,255,0.4); border-left: 3px solid #aad052; padding: 6px 8px; font-size: 12px; color: #555; margin-bottom: 6px; border-radius: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-style: italic; word-break: break-word; cursor: pointer; }
                     .reply-action-btn { opacity: 0.4; cursor: pointer; font-size: 14px; margin: 0 8px; background: #fffdf5; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: all 0.2s; border: 1px solid #aad052; flex-shrink: 0; }
                     .reply-action-btn:hover { opacity: 1; transform: scale(1.1); background: #aad052; }
                     
-                    /* NEW JUMBO EMOJI & GRID CSS */
                     .msg-jumbo-emoji { font-size: 45px !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
                     .emoji-grid-panel { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; background: #1e293b; border: 1px solid #aad052; padding: 15px; border-radius: 20px; position: absolute; bottom: 70px; left: 10px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100; max-height: 200px; overflow-y: auto; }
                     .emoji-grid-panel span { font-size: 26px; cursor: pointer; transition: transform 0.1s ease; text-align: center; }
@@ -565,7 +603,6 @@
                     .sticker-drawer-panel { display: flex; gap: 8px; background: #1e293b; border: 1px solid #aad052; padding: 12px; border-radius: 20px; position: absolute; bottom: 70px; right: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15); z-index: 100; max-width: 280px; flex-wrap: wrap; justify-content: center; max-height: 220px; overflow-y: auto; }
                     .sticker-drawer-panel img { width: 55px; height: 55px; cursor: pointer; transition: transform 0.1s ease; object-fit: contain; border-radius: 8px; }
                     .sticker-drawer-panel img:hover { transform: scale(1.15); background: rgba(255,255,255,0.1); }
-                    .sticker-display-img { max-width: 140px; border-radius: 8px; margin-top: 4px; background: transparent; pointer-events: none; }
                     .msg-bubble { word-break: break-word !important; overflow-wrap: anywhere !important; }
                     .msg-bubble-media { max-width: 100% !important; object-fit: contain; }
                 </style>
@@ -583,7 +620,11 @@
                         </div>
                     </div>
 
-                    <div class="chat-log-display" id="chatLogDisplay" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box;"></div>
+                    <!-- Chat Container with attached Scroll Listener -->
+                    <div class="chat-log-display" id="chatLogDisplay" onscroll="handleChatLogScroll()" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box;"></div>
+
+                    <!-- Floating Back to Bottom Button -->
+                    <button id="scrollToBottomFloatingBtn" class="scroll-bottom-btn" onclick="snapChatToBottom()">▼</button>
 
                     <div id="typingIndicatorContainer" style="display:none; background: #e6c7c3; padding: 4px 20px; font-size: 13px; color: #961808; text-align: left; border-top: 1px solid #aad052;">
                         <i>${capitalizeFirstLetter(targetUsername)} is typing</i> <span class="paw-anim" style="animation-delay: 0s;">🐾</span><span class="paw-anim" style="animation-delay: 0.2s;">🐾</span><span class="paw-anim" style="animation-delay: 0.4s;">🐾</span>
@@ -666,9 +707,10 @@
                         let text = msgToken.substring(separatorIndex + 1);
 
                         let timeStringFormatted = "";
+                        let timestampMs = 0;
                         const timeSplitIdx = text.lastIndexOf("|~|");
                         if (timeSplitIdx !== -1) {
-                            const timestampMs = parseInt(text.substring(timeSplitIdx + 3), 10);
+                            timestampMs = parseInt(text.substring(timeSplitIdx + 3), 10);
                             text = text.substring(0, timeSplitIdx); 
                             if (!isNaN(timestampMs)) {
                                 const dateObj = new Date(timestampMs);
@@ -676,14 +718,21 @@
                             }
                         }
 
-                        // DECRYPT E2E PAYLOAD
                         text = decryptE2E(text, roomKey);
 
                         let quotedText = "";
+                        let targetMsgId = "";
                         const replyMatch = text.match(/\[REPLY\](.*?)\[\/REPLY\]/);
                         if (replyMatch) {
                             quotedText = replyMatch[1];
                             text = text.replace(replyMatch[0], "").trim();
+                            
+                            // Check if the reply target includes an embedded system reference ID
+                            const idMatch = quotedText.match(/\[MSGID:(.*?)\]/);
+                            if (idMatch) {
+                                targetMsgId = idMatch[1];
+                                quotedText = quotedText.replace(idMatch[0], "");
+                            }
                         }
 
                         let stickerPath = "";
@@ -693,7 +742,6 @@
                             text = text.replace(stickerMatch[0], "").trim(); 
                         }
 
-                        // --- JUMBO EMOJI DETECTION LOGIC ---
                         let isJumboEmoji = false;
                         if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText) {
                             try {
@@ -701,7 +749,7 @@
                                 if (text.trim().length > 0 && text.length <= 20 && emojiRegex.test(text)) {
                                     isJumboEmoji = true;
                                 }
-                            } catch(e) {} // Fallback for older browsers
+                            } catch(e) {}
                         }
 
                         if (sender !== currentUser) hasFreshIncomingMessage = true;
@@ -711,12 +759,16 @@
                         bubbleWrapper.className = (sender === currentUser) ? "msg-wrapper msg-outgoing-wrapper" : "msg-wrapper";
                         bubbleWrapper.style.alignSelf = (sender === currentUser) ? "flex-end" : "flex-start";
                         bubbleWrapper.style.maxWidth = "85%";
+                        
+                        // Give each message wrapper an addressable ID using its timestamp token
+                        if (timestampMs > 0) {
+                            bubbleWrapper.id = "msg-" + timestampMs;
+                        }
 
                         const bubble = document.createElement('div');
                         bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
                         bubble.style.maxWidth = "100%"; bubble.style.alignSelf = "stretch";
 
-                        // Apply Jumbo Class if True
                         if (isJumboEmoji) {
                             bubble.classList.add("msg-jumbo-emoji");
                         }
@@ -731,10 +783,19 @@
                             bubble.style.background = "transparent"; bubble.style.padding = "0";
                         } else { bubble.innerText = text; }
 
+                        // Inject the reply box if this is an answer to a prior question
                         if (quotedText) {
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'msg-quoted';
                             quoteDiv.innerText = quotedText;
+                            
+                            // If a target text connection exists, bind the layout jump script
+                            if (targetMsgId) {
+                                quoteDiv.onclick = function(e) {
+                                    e.stopPropagation();
+                                    navigateToQuotedMessage(targetMsgId);
+                                };
+                            }
                             bubble.insertBefore(quoteDiv, bubble.firstChild);
                         }
 
@@ -744,7 +805,9 @@
                         const replyBtn = document.createElement('button');
                         replyBtn.className = 'reply-action-btn'; replyBtn.innerHTML = '↩️';
                         let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
-                        replyBtn.onclick = () => prepareReply(plainTextToQuote);
+                        
+                        // Pass down the unique generated wrapper ID to context hooks
+                        replyBtn.onclick = () => prepareReply(plainTextToQuote, bubbleWrapper.id);
 
                         if (sender === currentUser) { bubbleRow.appendChild(replyBtn); bubbleRow.appendChild(bubble); } 
                         else { bubbleRow.appendChild(bubble); bubbleRow.appendChild(replyBtn); }
@@ -807,36 +870,6 @@
              field.dataset.isTyping = "";
              fetch(`${backendBaseUrl}/api/setTyping?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}&typing=false`).catch(()=>{});
         }
-    }
-
-    function triggerMessageDispatch() {
-        const inputField = document.getElementById('msgInputField');
-        if(!inputField) return;
-
-        let messageContent = inputField.value.trim();
-        if(!messageContent || !activeChatTarget) return;
-
-        messageContent = messageContent.replace(/\n/g, "<br>");
-        if (currentReplyContext !== "") {
-            messageContent = `[REPLY]${currentReplyContext}[/REPLY]` + messageContent;
-            cancelReply(); 
-        }
-
-        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-
-        // --- ENCRYPT PAYLOAD BEFORE SENDING (SKIPPING MEDIA & STICKERS) ---
-        let roomKey = [user, activeChatTarget].sort().join('#');
-        let securePayload = messageContent;
-        if (!securePayload.startsWith("IMG_ATTACHMENT_DATA:") && !securePayload.includes("[STICKER]")) {
-            securePayload = encryptE2E(securePayload, roomKey);
-        }
-
-        inputField.value = ""; inputField.style.height = "45px"; inputField.dataset.isTyping = "";
-        fetch(`${backendBaseUrl}/api/setTyping?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}&typing=false`).catch(()=>{});
-
-        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
-        }).then(res => res.text()).then(() => { fetchActiveChatMessages(user, activeChatTarget); });
     }
 
     function processMediaFileTransmission(fileInput) {
@@ -919,12 +952,69 @@
         if(drawer) drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
     }
 
+    let currentReplyContext = "";
+    let currentReplyTargetId = "";
+
+    function prepareReply(textToQuote, targetId = "") {
+        currentReplyContext = textToQuote;
+        currentReplyTargetId = targetId;
+        const banner = document.getElementById('activeReplyBanner');
+        const bannerText = document.getElementById('replyBannerText');
+        if (banner && bannerText) { 
+            banner.style.display = 'block'; 
+            bannerText.innerText = textToQuote; 
+            document.getElementById('msgInputField').focus(); 
+        }
+    }
+
+    function cancelReply() { 
+        currentReplyContext = ""; 
+        currentReplyTargetId = ""; 
+        const banner = document.getElementById('activeReplyBanner'); 
+        if (banner) banner.style.display = 'none'; 
+    }
+
+    function triggerMessageDispatch() {
+        const inputField = document.getElementById('msgInputField');
+        if(!inputField) return;
+
+        let messageContent = inputField.value.trim();
+        if(!messageContent || !activeChatTarget) return;
+
+        messageContent = messageContent.replace(/\n/g, "<br>");
+        if (currentReplyContext !== "") {
+            // Append target system ID tracking directly inside safe token tags
+            let routingPrefix = currentReplyTargetId ? `[MSGID:${currentReplyTargetId}]` : "";
+            messageContent = `[REPLY]${routingPrefix}${currentReplyContext}[/REPLY]` + messageContent;
+            cancelReply(); 
+        }
+
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        let roomKey = [user, activeChatTarget].sort().join('#');
+        let securePayload = messageContent;
+        if (!securePayload.startsWith("IMG_ATTACHMENT_DATA:") && !securePayload.includes("[STICKER]")) {
+            securePayload = encryptE2E(securePayload, roomKey);
+        }
+
+        inputField.value = ""; inputField.style.height = "45px"; inputField.dataset.isTyping = "";
+        fetch(`${backendBaseUrl}/api/setTyping?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}&typing=false`).catch(()=>{});
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
+        }).then(res => res.text()).then(() => { fetchActiveChatMessages(user, activeChatTarget); });
+    }
+
     function sendSticker(stickerFileName) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         if(!activeChatTarget) return;
 
         let payload = `[STICKER]stickers/${stickerFileName}[/STICKER]`;
-        if (currentReplyContext !== "") { payload = `[REPLY]${currentReplyContext}[/REPLY]` + payload; cancelReply(); }
+        if (currentReplyContext !== "") { 
+            let routingPrefix = currentReplyTargetId ? `[MSGID:${currentReplyTargetId}]` : "";
+            payload = `[REPLY]${routingPrefix}${currentReplyContext}[/REPLY]` + payload; 
+            cancelReply(); 
+        }
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: payload
@@ -934,15 +1024,7 @@
         });
     }
 
-    let currentReplyContext = "";
-    function prepareReply(textToQuote) {
-        currentReplyContext = textToQuote;
-        const banner = document.getElementById('activeReplyBanner');
-        const bannerText = document.getElementById('replyBannerText');
-        if (banner && bannerText) { banner.style.display = 'block'; bannerText.innerText = textToQuote; document.getElementById('msgInputField').focus(); }
-    }
-    function cancelReply() { currentReplyContext = ""; const banner = document.getElementById('activeReplyBanner'); if (banner) banner.style.display = 'none'; }
-
+    
     // --- RESTORED EMOJI HELPERS ---
     function toggleEmojiDrawerOverlay() {
         const drawer = document.getElementById('emojiMiniDrawer');
@@ -968,6 +1050,53 @@
         if(inputField) {
             inputField.value += emojiChar;
             inputField.focus();
+        }
+    }
+
+    // --- NEW: LOGIC TO HANDLE TARGET SCROLL SCROLL-TO-REPLY HIGHLIGHTS ---
+    function navigateToQuotedMessage(msgElementId) {
+        const targetBubble = document.getElementById(msgElementId);
+        if (!targetBubble) return;
+
+        // Smoothly roll container viewport to targeted context bubble area
+        targetBubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Strip previous flash trackers to reset trigger timers cleanly
+        targetBubble.classList.remove('msg-highlight-active');
+        
+        // Trick engine reflow processing pipelines to guarantee animation restart
+        void targetBubble.offsetWidth; 
+
+        // Apply style animations
+        targetBubble.classList.add('msg-highlight-active');
+        
+        // Strip out highlight rules once animation finishes
+        setTimeout(() => {
+            targetBubble.classList.remove('msg-highlight-active');
+        }, 1500);
+    }
+
+    // --- NEW: MONITORS SCROLL DEPTH TO TOGGLE FLOATING BUTTON VIEW STATUS ---
+    function handleChatLogScroll() {
+        const logBox = document.getElementById('chatLogDisplay');
+        const floatBtn = document.getElementById('scrollToBottomFloatingBtn');
+        if (!logBox || !floatBtn) return;
+
+        // Check if user has scrolled up more than 400 pixels from the bottom
+        let distanceFromBottom = logBox.scrollHeight - logBox.clientHeight - logBox.scrollTop;
+        
+        if (distanceFromBottom > 400) {
+            floatBtn.classList.add('visible');
+        } else {
+            floatBtn.classList.remove('visible');
+        }
+    }
+
+    // --- NEW: SNAPS LOG DISPLAY VIEWPORT CLEANLY BACK DOWN TO BASE LINE ---
+    function snapChatToBottom() {
+        const logBox = document.getElementById('chatLogDisplay');
+        if (logBox) {
+            logBox.scrollTo({ top: logBox.scrollHeight, behavior: 'smooth' });
         }
     }
 
