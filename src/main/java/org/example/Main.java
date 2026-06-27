@@ -143,7 +143,6 @@ public class Main {
                 finalResult = finalResult.substring(0, finalResult.length() - 3);
             }
             
-            // --- NEW: AUTO-CLEANING MOMENTS ENGINE ---
             StringBuilder momentsData = new StringBuilder();
             long cutoff = System.currentTimeMillis() - (24 * 60 * 60 * 1000L); 
             try (Connection conn = DriverManager.getConnection(DB_URL)) {
@@ -406,7 +405,6 @@ public class Main {
             ctx.result("DELETED");
         });
 
-        // --- NEW: UPLOAD MOMENT (STATUS) ---
         app.post("/api/uploadMoment", ctx -> {
             String from = ctx.queryParam("from");
             String targets = ctx.queryParam("targets");
@@ -428,7 +426,6 @@ public class Main {
             }
         });
 
-        // --- NEW: VIEW MOMENT (STATUS) ---
         app.get("/api/viewMoment", ctx -> {
             String author = ctx.queryParam("author");
             if (author == null) return;
@@ -455,6 +452,7 @@ public class Main {
     private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
+            
             stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS connections (user1 TEXT, user2 TEXT, PRIMARY KEY (user1, user2));");
             stmt.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_key TEXT, token TEXT);");
@@ -473,10 +471,41 @@ public class Main {
                 establishedConnections.add(rsConn.getString("user2") + ":" + rsConn.getString("user1"));
             }
 
-            ResultSet rsMsg = stmt.executeQuery("SELECT room_key, token FROM messages ORDER BY id ASC;");
+            // --- THE NEW 30-DAY AUTO-CLEANUP SWEEP ---
+            ResultSet rsMsg = stmt.executeQuery("SELECT id, room_key, token FROM messages ORDER BY id ASC;");
+            long thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000L);
+            ArrayList<Integer> idsToDelete = new ArrayList<>();
+
             while (rsMsg.next()) {
-                chatHistories.putIfAbsent(rsMsg.getString("room_key"), new ArrayList<>());
-                chatHistories.get(rsMsg.getString("room_key")).add(rsMsg.getString("token"));
+                int msgId = rsMsg.getInt("id");
+                String roomKey = rsMsg.getString("room_key");
+                String token = rsMsg.getString("token");
+
+                long ts = System.currentTimeMillis(); 
+                try {
+                    int idx = token.lastIndexOf("|~|");
+                    if (idx != -1) {
+                        ts = Long.parseLong(token.substring(idx + 3));
+                    }
+                } catch (Exception e) {}
+
+                if (ts < thirtyDaysAgo) {
+                    idsToDelete.add(msgId); // Mark for permanent deletion
+                } else {
+                    chatHistories.putIfAbsent(roomKey, new ArrayList<>());
+                    chatHistories.get(roomKey).add(token); // Load into active memory
+                }
+            }
+
+            // Execute the bulk database wipe
+            if (!idsToDelete.isEmpty()) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE id = ?")) {
+                    for (int id : idsToDelete) {
+                        ps.setInt(1, id);
+                        ps.executeUpdate();
+                    }
+                }
+                System.out.println("🧹 Cleaned up " + idsToDelete.size() + " messages older than 30 days.");
             }
 
             ResultSet rsPics = stmt.executeQuery("SELECT username, payload FROM profile_pics;");
