@@ -146,6 +146,29 @@
             z-index: 9999;
             text-shadow: 0 0 10px rgba(255, 105, 180, 0.6);
         }
+
+        /* --- NEW: TIME CAPSULE CSS --- */
+        #capsuleModal { z-index: 10001; }
+        .capsule-timer-btn { background: #e6c7c3; border: 1px solid #aad052; padding: 8px; border-radius: 6px; cursor: pointer; flex: 1; margin: 2px; font-weight: bold; color: #7a1029; transition: all 0.2s;}
+        .capsule-timer-btn.selected { background: #fb9fa3; color: white; border-color: #ffc8b0; transform: scale(1.05); }
+        
+        #capsuleDisplayOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(255,200,176,0.95), rgba(251,159,163,0.95));
+            z-index: 10005; display: none; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 1s ease; backdrop-filter: blur(5px);
+        }
+        #capsuleDisplayOverlay.visible { opacity: 1; }
+        .capsule-envelope { font-size: 80px; animation: softBreathe 3s infinite; margin-bottom: 20px; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.1)); }
+        .capsule-message-box {
+            background: #fffdf5; padding: 30px; border-radius: 20px; max-width: 80%; width: 300px;
+            text-align: center; color: #7a1029; font-size: 18px; font-weight: bold;
+            box-shadow: 0 20px 40px rgba(122, 16, 41, 0.2); transform: scale(0.8) translateY(20px); 
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid #fb9fa3;
+        }
+        #capsuleDisplayOverlay.open .capsule-message-box { transform: scale(1) translateY(0); }
+        .capsule-locked-bubble { opacity: 0.7; font-style: italic; background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px) !important; }
         
     </style>
     <link rel="manifest" href="/manifest.json">
@@ -246,6 +269,37 @@
         <h3 id="sysAlertTitle" style="color: #7a1029;">System Notification</h3>
         <p id="sysAlertText" style="color: #b31e41;"></p>
         <button class="sync-btn" onclick="dismissCustomSystemAlert()">Acknowledge</button>
+    </div>
+</div>
+    
+<!-- Time Capsule Creator Modal -->
+<div id="capsuleCreatorModal" class="modal-overlay">
+    <div class="modal-box" style="text-align: left; background: #fdf8ef;">
+        <h3 style="margin-top: 0; color: #aad052;">⏳ Send a Time Capsule</h3>
+        <p style="font-size: 13px; color: #555; margin-bottom: 10px;">Seal a secret message that cannot be opened until the timer hits zero.</p>
+        <textarea id="capsuleInput" placeholder="Write your secret letter here..." rows="4" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #aad052; box-sizing: border-box; resize: none; margin-bottom: 10px; font-family: inherit; font-size: 14px; outline: none;"></textarea>
+        <p style="font-size: 13px; margin-bottom: 5px; font-weight: bold; color: #334155;">Unlock In:</p>
+        <div style="display: flex; gap: 5px; margin-bottom: 20px;" id="capsuleTimeOptions">
+            <button class="capsule-timer-btn selected" onclick="setCapsuleTime(this, 15)">15m</button>
+            <button class="capsule-timer-btn" onclick="setCapsuleTime(this, 30)">30m</button>
+            <button class="capsule-timer-btn" onclick="setCapsuleTime(this, 60)">1h</button>
+            <button class="capsule-timer-btn" onclick="setCapsuleTime(this, 720)">12h</button>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-accept" style="background: #aad052; color: white;" onclick="dispatchTimeCapsule()">🔒 Lock & Send</button>
+            <button class="btn-decline" onclick="document.getElementById('capsuleCreatorModal').classList.remove('active')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Time Capsule Full Screen Cinematic Reveal -->
+<div id="capsuleDisplayOverlay">
+    <div class="capsule-envelope">💌</div>
+    <div class="capsule-message-box">
+        <p style="font-size: 13px; color: #aad052; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">A Time Capsule from <br><span id="capsuleSenderName" style="font-size: 18px; color: #7a1029;"></span></p>
+        <hr style="border-top: 1px dashed #fb9fa3; margin: 15px 0;">
+        <div id="capsuleRevealedText" style="margin: 20px 0; word-break: break-word; line-height: 1.5; font-weight: normal; font-size: 16px;"></div>
+        <button class="sync-btn" style="background: #fb9fa3; width: auto; padding: 10px 24px; border-radius: 20px;" onclick="closeCapsuleOverlay()">Keep Forever ✨</button>
     </div>
 </div>
 
@@ -673,7 +727,7 @@
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
-                        
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Time Capsule" onclick="openCapsuleModal()">⏳</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Thinking of You" onclick="sendHeartbeat()">💖</button>
 
                         <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)" onfocus="setTimeout(snapChatToBottom, 300)"></textarea>
@@ -713,7 +767,6 @@
 
                 let roomKey = [currentUser, targetUser].sort().join('#'); 
 
-                // -- NEW: Pet Tamagotchi Logic --
                 let todayMsgCount = 0;
                 const todayStart = new Date().setHours(0,0,0,0);
                 incomingMessageTokens.forEach(token => {
@@ -757,13 +810,37 @@
 
                         text = decryptE2E(text, roomKey);
 
-                        // -- NEW: Heartbeat Intercept --
                         let isHeartbeat = false;
                         if (text.trim() === "[SYSTEM_HEARTBEAT]") {
                             isHeartbeat = true;
                             if (sender !== currentUser && !isInitialLoad && !triggeredHeartbeatThisCycle) {
                                 triggerHeartbeatAnimation();
                                 triggeredHeartbeatThisCycle = true;
+                            }
+                        }
+
+                        // -- NEW: Time Capsule Logic --
+                        let isCapsule = false;
+                        let capsuleIsLocked = false;
+                        const capsuleMatch = text.match(/\[CAPSULE:(\d+)\](.*)/s);
+                        if (capsuleMatch) {
+                            isCapsule = true;
+                            let unlockTime = parseInt(capsuleMatch[1], 10);
+                            let secretText = capsuleMatch[2].trim();
+                            
+                            if (Date.now() < unlockTime) {
+                                capsuleIsLocked = true;
+                                text = "⏳ Locked Time Capsule";
+                            } else {
+                                text = "✨ " + secretText;
+                                // Only trigger the cinematic reveal if they received it and haven't seen it yet
+                                if (sender !== currentUser && timestampMs > 0) {
+                                    let storageKey = "capsule_played_" + timestampMs;
+                                    if (!localStorage.getItem(storageKey)) {
+                                        localStorage.setItem(storageKey, "true");
+                                        setTimeout(() => triggerCapsuleOverlay(sender, secretText), 500);
+                                    }
+                                }
                             }
                         }
 
@@ -788,7 +865,7 @@
                         }
 
                         let isJumboEmoji = false;
-                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText && !isHeartbeat) {
+                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText && !isHeartbeat && !isCapsule) {
                             try {
                                 const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
                                 if (text.trim().length > 0 && text.length <= 20 && emojiRegex.test(text)) isJumboEmoji = true;
@@ -810,6 +887,7 @@
                         bubble.style.maxWidth = "100%"; bubble.style.alignSelf = "stretch";
 
                         if (isJumboEmoji) bubble.classList.add("msg-jumbo-emoji");
+                        if (capsuleIsLocked) bubble.classList.add("capsule-locked-bubble");
 
                         if (stickerPath) {
                             bubble.innerHTML = `<img src="${stickerPath}" class="sticker-display-img">`;
@@ -819,7 +897,7 @@
                             if (!rawBase64Source.startsWith("data:") && !rawBase64Source.startsWith("http")) rawBase64Source = "data:image/jpeg;base64," + rawBase64Source;
                             bubble.innerHTML = `<img src="${rawBase64Source}" class="msg-bubble-media" onclick="window.open('${rawBase64Source}', '_blank')">`;
                             bubble.style.background = "transparent"; bubble.style.padding = "0";
-                        } else { bubble.innerText = text; }
+                        } else { bubble.innerHTML = text; }
 
                         if (quotedText && !isHeartbeat) {
                             const quoteDiv = document.createElement('div');
@@ -833,7 +911,6 @@
                         bubbleRow.style.display = 'flex'; bubbleRow.style.alignItems = 'center'; bubbleRow.style.maxWidth = "100%";
 
                         if (isHeartbeat) {
-                            // Render a tiny, centered system message for the heartbeat instead of a normal bubble
                             bubbleWrapper.style.alignItems = "center";
                             bubbleWrapper.style.alignSelf = "center";
                             bubble.innerHTML = sender === currentUser ? "<i>💖 You sent a heartbeat</i>" : `<i>💖 ${capitalizeFirstLetter(sender)} sent a heartbeat</i>`;
@@ -843,7 +920,7 @@
                         } else {
                             const replyBtn = document.createElement('button');
                             replyBtn.className = 'reply-action-btn'; replyBtn.innerHTML = '↩️';
-                            let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
+                            let plainTextToQuote = isCapsule ? "⏳ Time Capsule" : (stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text));
                             replyBtn.onclick = () => prepareReply(plainTextToQuote, bubbleWrapper.id);
 
                             if (sender === currentUser) { bubbleRow.appendChild(replyBtn); bubbleRow.appendChild(bubble); } 
@@ -1193,6 +1270,90 @@
         if (logBox) {
             logBox.scrollTo({ top: logBox.scrollHeight, behavior: 'smooth' });
         }
+    }
+
+    // --- NEW: TIME CAPSULE LOGIC ---
+    let selectedCapsuleMinutes = 15;
+
+    function openCapsuleModal() {
+        document.getElementById('capsuleInput').value = "";
+        selectedCapsuleMinutes = 15;
+        document.querySelectorAll('.capsule-timer-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector('.capsule-timer-btn').classList.add('selected');
+        document.getElementById('capsuleCreatorModal').classList.add('active');
+        
+        // Hide keyboard nicely if a drawer was open
+        const inputField = document.getElementById('msgInputField');
+        if (inputField) inputField.blur();
+    }
+
+    function setCapsuleTime(btn, mins) {
+        document.querySelectorAll('.capsule-timer-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedCapsuleMinutes = mins;
+    }
+
+    function dispatchTimeCapsule() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if(!activeChatTarget) return;
+
+        let messageContent = document.getElementById('capsuleInput').value.trim();
+        if(!messageContent) return;
+        messageContent = messageContent.replace(/\n/g, "<br>");
+
+        // Calculate unlock time
+        let unlockTimestamp = Date.now() + (selectedCapsuleMinutes * 60 * 1000);
+        let finalPayload = `[CAPSULE:${unlockTimestamp}]${messageContent}`;
+
+        let roomKey = [user, activeChatTarget].sort().join('#');
+        let securePayload = encryptE2E(finalPayload, roomKey);
+
+        document.getElementById('capsuleCreatorModal').classList.remove('active');
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
+        }).then(() => {
+            fetchActiveChatMessages(user, activeChatTarget);
+        });
+    }
+
+    let capsuleQueue = [];
+    let isCapsulePlaying = false;
+
+    function triggerCapsuleOverlay(sender, text) {
+        capsuleQueue.push({sender, text});
+        playNextCapsule();
+    }
+
+    function playNextCapsule() {
+        if(isCapsulePlaying || capsuleQueue.length === 0) return;
+        isCapsulePlaying = true;
+        
+        let cap = capsuleQueue.shift();
+        const overlay = document.getElementById('capsuleDisplayOverlay');
+        document.getElementById('capsuleSenderName').innerText = capitalizeFirstLetter(cap.sender);
+        document.getElementById('capsuleRevealedText').innerHTML = cap.text;
+        
+        // Optional: Native device vibration for dramatic effect
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+        
+        overlay.style.display = 'flex';
+        // Tiny delay allows CSS transitions to catch the DOM change
+        setTimeout(() => {
+            overlay.classList.add('visible');
+            overlay.classList.add('open');
+        }, 50);
+    }
+
+    function closeCapsuleOverlay() {
+        const overlay = document.getElementById('capsuleDisplayOverlay');
+        overlay.classList.remove('visible');
+        overlay.classList.remove('open');
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            isCapsulePlaying = false;
+            playNextCapsule(); // Play next if multiple unlocked at once
+        }, 1000);
     }
 
 </script>
