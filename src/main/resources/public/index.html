@@ -169,6 +169,24 @@
         }
         #capsuleDisplayOverlay.open .capsule-message-box { transform: scale(1) translateY(0); }
         .capsule-locked-bubble { opacity: 0.7; font-style: italic; background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px) !important; }
+
+        /* --- NEW: DYNAMIC TYPING UI ANIMATION --- */
+        .hide-on-type {
+            transition: width 0.3s ease, opacity 0.3s ease, margin 0.3s ease, transform 0.3s ease;
+            width: 30px;
+            opacity: 1;
+            overflow: hidden;
+            display: flex; 
+        }
+        .chat-typing-active .hide-on-type {
+            width: 0 !important;
+            opacity: 0 !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            padding: 0 !important;
+            transform: scale(0);
+            pointer-events: none;
+        }
         
     </style>
     <link rel="manifest" href="/manifest.json">
@@ -296,7 +314,7 @@
 <div id="capsuleDisplayOverlay">
     <div class="capsule-envelope">💌</div>
     <div class="capsule-message-box">
-        <p style="font-size: 13px; color: #aad052; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">A Time Capsule from <br><span id="capsuleSenderName" style="font-size: 18px; color: #7a1029;"></span></p>
+        <p style="font-size: 13px; color: #aad052; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">A Secret Letter from <br><span id="capsuleSenderName" style="font-size: 18px; color: #7a1029;"></span></p>
         <hr style="border-top: 1px dashed #fb9fa3; margin: 15px 0;">
         <div id="capsuleRevealedText" style="margin: 20px 0; word-break: break-word; line-height: 1.5; font-weight: normal; font-size: 16px;"></div>
         <button class="sync-btn" style="background: #fb9fa3; width: auto; padding: 10px 24px; border-radius: 20px;" onclick="closeCapsuleOverlay()">Keep Forever ✨</button>
@@ -721,16 +739,18 @@
                         <span onclick="cancelReply()" style="position: absolute; right: 10px; top: 8px; cursor: pointer; color: #961808; font-weight: bold; padding: 4px; font-size: 16px;">✕</span>
                     </div>
 
-                    <div class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:4px; padding:10px 6px; background:#e6c7c3; border-top:1px solid #edbdb7; width: 100%; box-sizing: border-box;">
+                    <div id="chatFooterBar" class="chat-footer-input-bar" style="display:flex; align-items:flex-end; gap:4px; padding:10px 6px; background:#e6c7c3; border-top:1px solid #edbdb7; width: 100%; box-sizing: border-box; transition: all 0.3s ease;">
                         <input type="file" id="chatMediaSelectorInput" accept="image/*" style="display:none;" onchange="processMediaFileTransmission(this)">
                         
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        <button class="tool-action-btn hide-on-type" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
+                        
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Time Capsule" onclick="openCapsuleModal()">⏳</button>
-                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Thinking of You" onclick="sendHeartbeat()">💖</button>
+                        
+                        <button class="tool-action-btn hide-on-type" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
+                        <button class="tool-action-btn hide-on-type" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Time Capsule" onclick="openCapsuleModal()">⏳</button>
+                        <button class="tool-action-btn hide-on-type" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Thinking of You" onclick="sendHeartbeat()">💖</button>
 
-                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)" onfocus="setTimeout(snapChatToBottom, 300)"></textarea>
+                        <textarea id="msgInputField" placeholder="Type here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4; transition: all 0.3s ease;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)" onfocus="setTimeout(snapChatToBottom, 300)"></textarea>
 
                         <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
                     </div>
@@ -970,6 +990,18 @@
     function handleTypingInput(field) {
         field.style.height='auto'; field.style.height=Math.min(field.scrollHeight, 120)+'px';
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        
+        // --- NEW: Toggle the dynamic button hiding ---
+        const footerBar = document.getElementById('chatFooterBar');
+        if (footerBar) {
+            if (field.value.trim().length > 0) {
+                footerBar.classList.add('chat-typing-active');
+            } else {
+                footerBar.classList.remove('chat-typing-active');
+                field.style.height = '42px'; // Reset height cleanly if empty
+            }
+        }
+
         if(!activeChatTarget) return;
 
         if (field.value.trim().length > 0) {
@@ -1099,7 +1131,6 @@
 
         messageContent = messageContent.replace(/\n/g, "<br>");
         if (currentReplyContext !== "") {
-            // Append target system ID tracking directly inside safe token tags
             let routingPrefix = currentReplyTargetId ? `[MSGID:${currentReplyTargetId}]` : "";
             messageContent = `[REPLY]${routingPrefix}${currentReplyContext}[/REPLY]` + messageContent;
             cancelReply(); 
@@ -1113,7 +1144,14 @@
             securePayload = encryptE2E(securePayload, roomKey);
         }
 
-        inputField.value = ""; inputField.style.height = "45px"; inputField.dataset.isTyping = "";
+        inputField.value = ""; 
+        inputField.style.height = "42px"; 
+        inputField.dataset.isTyping = "";
+        
+        // --- NEW: Reset dynamic UI back to default instantly when message is sent ---
+        const footerBar = document.getElementById('chatFooterBar');
+        if (footerBar) footerBar.classList.remove('chat-typing-active');
+
         fetch(`${backendBaseUrl}/api/setTyping?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}&typing=false`).catch(()=>{});
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
