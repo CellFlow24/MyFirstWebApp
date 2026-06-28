@@ -473,13 +473,29 @@
     function syncCycle(forceRender = false) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
-        // Return the fetch promise so the tab animation can wait for the network to finish!
+        // 1. Check for active messages
+        if (activeChatTarget) {
+            fetchActiveChatMessages(user, activeChatTarget);
+        }
+
+        // 2. Check for incoming invites (This was previously blocked by the return statement!)
+        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`).then(res => res.text()).then(response => {
+            const modal = document.getElementById('inviteModal');
+            if (response.startsWith("PENDING:")) {
+                currentInviteSender = response.split(":")[1];
+                if(!modal.classList.contains('active')) {
+                    document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(currentInviteSender)}</b> wants to chat.`;
+                    modal.classList.add('active');
+                }
+            }
+        });
+
+        // 3. Sync the main directory and return the promise for the tab animation
         return fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
             .then(res => res.text())
             .then(rawText => {
                 if(!rawText || rawText.trim() === "") return;
 
-                // --- FLICKER FIX: Incorporate the forceRender flag ---
                 let dataChanged = (rawText !== lastSyncPayload) || forceRender;
                 lastSyncPayload = rawText;
 
@@ -578,19 +594,6 @@
                 if (currentCycleUnreadSum > totalUnreadMessagesTracked) backgroundChime.play().catch(()=>{});
                 totalUnreadMessagesTracked = currentCycleUnreadSum;
             });
-
-        if (activeChatTarget) fetchActiveChatMessages(user, activeChatTarget);
-
-        fetch(`${backendBaseUrl}/api/checkInvites?user=${encodeURIComponent(user)}`).then(res => res.text()).then(response => {
-            const modal = document.getElementById('inviteModal');
-            if (response.startsWith("PENDING:")) {
-                currentInviteSender = response.split(":")[1];
-                if(!modal.classList.contains('active')) {
-                    document.getElementById('modalMessage').innerHTML = `<b>${capitalizeFirstLetter(currentInviteSender)}</b> wants to chat.`;
-                    modal.classList.add('active');
-                }
-            }
-        });
     }
     
     function deleteUserAccount(target) {
