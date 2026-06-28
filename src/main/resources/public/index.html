@@ -620,10 +620,8 @@
                         </div>
                     </div>
 
-                    <!-- Chat Container with attached Scroll Listener -->
                     <div class="chat-log-display" id="chatLogDisplay" onscroll="handleChatLogScroll()" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box;"></div>
 
-                    <!-- Floating Back to Bottom Button -->
                     <button id="scrollToBottomFloatingBtn" class="scroll-bottom-btn" onclick="snapChatToBottom()">▼</button>
 
                     <div id="typingIndicatorContainer" style="display:none; background: #e6c7c3; padding: 4px 20px; font-size: 13px; color: #961808; text-align: left; border-top: 1px solid #aad052;">
@@ -658,7 +656,7 @@
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
 
-                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)"></textarea>
+                        <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)" onfocus="setTimeout(snapChatToBottom, 300)"></textarea>
 
                         <button id="mobileSendBtn" class="sync-btn" style="width: 42px !important; height: 42px !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #99464b 0%, #fe9a9f 100%) !important; border: none !important; color: white !important; padding: 0 !important; border-radius: 50% !important; cursor: pointer; display: inline-flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px;" onclick="triggerMessageDispatch()"><span style="display: inline-block; transform: rotate(-45deg); font-size: 25px; line-height: 1; margin-left: 1px; margin-top: -3px; pointer-events: none;">➤</span></button>
                     </div>
@@ -942,7 +940,7 @@
     }
 
     const stickerCollection = [
-        'tkiss.png', 'baby.png', 'backhug.png', 'hmmm.png', 'hugs.png', 
+        'tkiss.png', 'baby.png', 'backhug.png', 'hmmm.png', 'hugs.png', 'babyh.png', 'slllll.png',
         'kiss.png', 'looks.png', 'sleep.png', 'ufbaby.png', 'uffhug.png', 'ufhug.png', 'ggkiss.png',
         'ghug.png', 'gkiss.png', 'gsleep.png', 'hand.png', 'head.png', 'thug.png', 'angry.png'
     ];
@@ -1034,22 +1032,33 @@
         // Auto-close sticker drawer if open
         const stickerDrawer = document.getElementById('stickerMiniDrawer');
         if(stickerDrawer) stickerDrawer.style.display = 'none';
+
+        // Drop the keyboard when opening the emoji drawer
+        if (drawer.style.display === 'grid') {
+            const inputField = document.getElementById('msgInputField');
+            if (inputField) inputField.blur();
+        }
     }
 
-    // Update existing sticker toggle to auto-close emoji drawer
     function toggleStickerDrawerOverlay() {
         const drawer = document.getElementById('stickerMiniDrawer');
         if(drawer) drawer.style.display = (drawer.style.display === 'none') ? 'flex' : 'none';
         
         const emojiDrawer = document.getElementById('emojiMiniDrawer');
         if(emojiDrawer) emojiDrawer.style.display = 'none';
+
+        // Drop the keyboard when opening the sticker drawer
+        if (drawer.style.display === 'flex') {
+            const inputField = document.getElementById('msgInputField');
+            if (inputField) inputField.blur();
+        }
     }
 
     function injectEmojiToken(emojiChar) {
         const inputField = document.getElementById('msgInputField');
         if(inputField) {
             inputField.value += emojiChar;
-            inputField.focus();
+            // The focus() command was removed here so the keyboard won't pop up!
         }
     }
 
