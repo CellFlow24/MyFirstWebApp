@@ -187,6 +187,17 @@
             transform: scale(0);
             pointer-events: none;
         }
+
+        /* --- NEW: TAB SWITCH ANIMATION --- */
+        #userListContainer {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #userListContainer.tab-switching {
+            opacity: 0;
+            transform: translateY(10px);
+        }
         
     </style>
     <link rel="manifest" href="/manifest.json">
@@ -334,13 +345,16 @@
     const activeChatChime = new Audio('tune2.mp3'); 
     let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer, lastSyncPayload = ""; 
 
-    // --- NEW: DIRECTORY TAB LOGIC ---
+    // --- NEW: DIRECTORY TAB LOGIC WITH SMOOTH ANIMATION ---
     let currentDirectoryTab = 'connected';
 
     function switchDirectoryTab(tab) {
+        if (currentDirectoryTab === tab) return; // Prevent animation if tapping the same tab twice
+
         currentDirectoryTab = tab;
         const btnConnected = document.getElementById('tabConnectedBtn');
         const btnNew = document.getElementById('tabNewBtn');
+        const listContainer = document.getElementById('userListContainer');
         
         if (tab === 'connected') {
             btnConnected.style.background = '#fb9fa3'; btnConnected.style.color = 'white';
@@ -350,11 +364,17 @@
             btnConnected.style.background = 'transparent'; btnConnected.style.color = '#7a1029';
         }
         
-        // Force the list to rebuild instantly so it feels snappy!
-        lastSyncPayload = ""; 
-        syncCycle();
+        // 1. Trigger the fade-out and slide-down animation
+        if (listContainer) listContainer.classList.add('tab-switching');
+        
+        // 2. Wait exactly 200ms (matching our CSS), then load new data and fade back in
+        setTimeout(() => {
+            lastSyncPayload = ""; 
+            syncCycle();
+            if (listContainer) listContainer.classList.remove('tab-switching');
+        }, 200);
     }
-
+    
     // --- E2EE SCRAMBLER ENGINE (EMOJI SAFE) ---
     function encryptE2E(text, key) {
         let result = '';
