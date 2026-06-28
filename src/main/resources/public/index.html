@@ -131,6 +131,22 @@
             transform: scale(1.1);
             background-color: #9ec246;
         }
+
+        /* --- NEW: HEARTBEAT ANIMATION --- */
+        @keyframes floatUpHeart {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-20vh) scale(1.2); opacity: 0.9; }
+            100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+        }
+        .floating-heart {
+            position: absolute;
+            bottom: 70px;
+            pointer-events: none;
+            animation: floatUpHeart ease-in forwards;
+            z-index: 9999;
+            text-shadow: 0 0 10px rgba(255, 105, 180, 0.6);
+        }
+        
     </style>
     <link rel="manifest" href="/manifest.json">
 </head>
@@ -615,6 +631,8 @@
                             <div id="userStatusWrapper" class="status-round-container">${initialStatusIconHtml}</div>
                         </div>
                         
+                        <div id="loungePetContainer" style="margin-left: 15px; font-size: 22px; transition: transform 0.3s; cursor: pointer;" title="Lounge Pet">💤🧸</div>
+
                         <div style="margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #15803d; background: #dcfce7; padding: 4px 8px; border-radius: 12px; font-weight: 600; animation: pulseGlow 3s infinite;">
                             <span>🔐</span> E2E Encrypted
                         </div>
@@ -655,6 +673,8 @@
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Image" onclick="document.getElementById('chatMediaSelectorInput').click()">🖼️</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Insert Emoji" onclick="toggleEmojiDrawerOverlay()">😊</button>
                         <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Send Sticker" onclick="toggleStickerDrawerOverlay()">🐶</button>
+                        
+                        <button class="tool-action-btn" style="background:none; border:none; font-size:22px; cursor:pointer; width: 30px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0; margin-bottom: 2px; flex-shrink: 0;" title="Thinking of You" onclick="sendHeartbeat()">💖</button>
 
                         <textarea id="msgInputField" placeholder="Type your message here..." rows="1" style="flex: 1 !important; min-width: 0 !important; background:#e6c7c3; border:1px solid #334155; color:#961808; padding:10px 12px; border-radius:8px; font-size:15px; outline:none; resize:none; max-height:120px; height:42px; box-sizing:border-box; overflow-y:auto; font-family:inherit; line-height:1.4;" onkeydown="handleChatKeyDown(event)" oninput="handleTypingInput(this)" onfocus="setTimeout(snapChatToBottom, 300)"></textarea>
 
@@ -693,9 +713,28 @@
 
                 let roomKey = [currentUser, targetUser].sort().join('#'); 
 
+                // -- NEW: Pet Tamagotchi Logic --
+                let todayMsgCount = 0;
+                const todayStart = new Date().setHours(0,0,0,0);
+                incomingMessageTokens.forEach(token => {
+                    const timeSplitIdx = token.lastIndexOf("|~|");
+                    if (timeSplitIdx !== -1) {
+                        const ts = parseInt(token.substring(timeSplitIdx + 3), 10);
+                        if (ts >= todayStart) todayMsgCount++;
+                    }
+                });
+
+                const pet = document.getElementById('loungePetContainer');
+                if (pet) {
+                    if (todayMsgCount > 15) { pet.innerText = "✨🧸✨"; pet.title = "Lounge Pet is very happy!"; } 
+                    else if (todayMsgCount > 2) { pet.innerText = "🧸💭"; pet.title = "Lounge Pet is waking up."; } 
+                    else { pet.innerText = "💤🧸"; pet.title = "Lounge Pet is sleeping. Chat to wake it up!"; }
+                }
+
                 if (incomingMessageTokens.length > currentLoadedMessageCount) {
                     const newPacketsToAppend = incomingMessageTokens.slice(currentLoadedMessageCount);
                     let hasFreshIncomingMessage = false;
+                    let triggeredHeartbeatThisCycle = false;
 
                     newPacketsToAppend.forEach(msgToken => {
                         const separatorIndex = msgToken.indexOf(':');
@@ -718,14 +757,22 @@
 
                         text = decryptE2E(text, roomKey);
 
+                        // -- NEW: Heartbeat Intercept --
+                        let isHeartbeat = false;
+                        if (text.trim() === "[SYSTEM_HEARTBEAT]") {
+                            isHeartbeat = true;
+                            if (sender !== currentUser && !isInitialLoad && !triggeredHeartbeatThisCycle) {
+                                triggerHeartbeatAnimation();
+                                triggeredHeartbeatThisCycle = true;
+                            }
+                        }
+
                         let quotedText = "";
                         let targetMsgId = "";
                         const replyMatch = text.match(/\[REPLY\](.*?)\[\/REPLY\]/);
                         if (replyMatch) {
                             quotedText = replyMatch[1];
                             text = text.replace(replyMatch[0], "").trim();
-                            
-                            // Check if the reply target includes an embedded system reference ID
                             const idMatch = quotedText.match(/\[MSGID:(.*?)\]/);
                             if (idMatch) {
                                 targetMsgId = idMatch[1];
@@ -741,12 +788,10 @@
                         }
 
                         let isJumboEmoji = false;
-                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText) {
+                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText && !isHeartbeat) {
                             try {
                                 const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
-                                if (text.trim().length > 0 && text.length <= 20 && emojiRegex.test(text)) {
-                                    isJumboEmoji = true;
-                                }
+                                if (text.trim().length > 0 && text.length <= 20 && emojiRegex.test(text)) isJumboEmoji = true;
                             } catch(e) {}
                         }
 
@@ -758,18 +803,13 @@
                         bubbleWrapper.style.alignSelf = (sender === currentUser) ? "flex-end" : "flex-start";
                         bubbleWrapper.style.maxWidth = "85%";
                         
-                        // Give each message wrapper an addressable ID using its timestamp token
-                        if (timestampMs > 0) {
-                            bubbleWrapper.id = "msg-" + timestampMs;
-                        }
+                        if (timestampMs > 0) bubbleWrapper.id = "msg-" + timestampMs;
 
                         const bubble = document.createElement('div');
                         bubble.className = (sender === currentUser) ? "msg-bubble msg-outgoing" : "msg-bubble msg-incoming";
                         bubble.style.maxWidth = "100%"; bubble.style.alignSelf = "stretch";
 
-                        if (isJumboEmoji) {
-                            bubble.classList.add("msg-jumbo-emoji");
-                        }
+                        if (isJumboEmoji) bubble.classList.add("msg-jumbo-emoji");
 
                         if (stickerPath) {
                             bubble.innerHTML = `<img src="${stickerPath}" class="sticker-display-img">`;
@@ -781,40 +821,41 @@
                             bubble.style.background = "transparent"; bubble.style.padding = "0";
                         } else { bubble.innerText = text; }
 
-                        // Inject the reply box if this is an answer to a prior question
-                        if (quotedText) {
+                        if (quotedText && !isHeartbeat) {
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'msg-quoted';
                             quoteDiv.innerText = quotedText;
-                            
-                            // If a target text connection exists, bind the layout jump script
-                            if (targetMsgId) {
-                                quoteDiv.onclick = function(e) {
-                                    e.stopPropagation();
-                                    navigateToQuotedMessage(targetMsgId);
-                                };
-                            }
+                            if (targetMsgId) quoteDiv.onclick = function(e) { e.stopPropagation(); navigateToQuotedMessage(targetMsgId); };
                             bubble.insertBefore(quoteDiv, bubble.firstChild);
                         }
 
                         const bubbleRow = document.createElement('div');
                         bubbleRow.style.display = 'flex'; bubbleRow.style.alignItems = 'center'; bubbleRow.style.maxWidth = "100%";
 
-                        const replyBtn = document.createElement('button');
-                        replyBtn.className = 'reply-action-btn'; replyBtn.innerHTML = '↩️';
-                        let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
-                        
-                        // Pass down the unique generated wrapper ID to context hooks
-                        replyBtn.onclick = () => prepareReply(plainTextToQuote, bubbleWrapper.id);
+                        if (isHeartbeat) {
+                            // Render a tiny, centered system message for the heartbeat instead of a normal bubble
+                            bubbleWrapper.style.alignItems = "center";
+                            bubbleWrapper.style.alignSelf = "center";
+                            bubble.innerHTML = sender === currentUser ? "<i>💖 You sent a heartbeat</i>" : `<i>💖 ${capitalizeFirstLetter(sender)} sent a heartbeat</i>`;
+                            bubble.style.background = "transparent"; bubble.style.boxShadow = "none";
+                            bubble.style.color = "#d946ef"; bubble.style.fontSize = "12px"; bubble.style.padding = "4px";
+                            bubbleRow.appendChild(bubble);
+                        } else {
+                            const replyBtn = document.createElement('button');
+                            replyBtn.className = 'reply-action-btn'; replyBtn.innerHTML = '↩️';
+                            let plainTextToQuote = stickerPath ? "🐶 Sticker" : (text.startsWith("IMG_ATTACHMENT_DATA:") ? "🖼️ Image Attachment" : text);
+                            replyBtn.onclick = () => prepareReply(plainTextToQuote, bubbleWrapper.id);
 
-                        if (sender === currentUser) { bubbleRow.appendChild(replyBtn); bubbleRow.appendChild(bubble); } 
-                        else { bubbleRow.appendChild(bubble); bubbleRow.appendChild(replyBtn); }
+                            if (sender === currentUser) { bubbleRow.appendChild(replyBtn); bubbleRow.appendChild(bubble); } 
+                            else { bubbleRow.appendChild(bubble); bubbleRow.appendChild(replyBtn); }
+                        }
 
                         bubbleWrapper.appendChild(bubbleRow);
 
                         const metaContainer = document.createElement('div');
                         metaContainer.style.cssText = 'display: flex; align-items: center; margin-top: 2px; padding: 0 4px;';
                         metaContainer.style.justifyContent = (sender === currentUser) ? 'flex-end' : 'flex-start';
+                        if(isHeartbeat) metaContainer.style.justifyContent = 'center';
 
                         const timeSpan = document.createElement('span');
                         timeSpan.style.cssText = 'font-size: 10px; color: #7a1029; opacity: 0.7; font-weight: 500; margin-right: 5px;';
@@ -1083,6 +1124,51 @@
         setTimeout(() => {
             targetBubble.classList.remove('msg-highlight-active');
         }, 1500);
+    }
+
+    // --- NEW: HEARTBEAT DISPATCH & ANIMATION ---
+    function sendHeartbeat() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if(!activeChatTarget) return;
+
+        let roomKey = [user, activeChatTarget].sort().join('#');
+        // Encrypt the heartbeat token so no one intercepts it!
+        let securePayload = encryptE2E("[SYSTEM_HEARTBEAT]", roomKey);
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
+        }).then(() => {
+            triggerHeartbeatAnimation(); // Flash it on your screen too!
+            fetchActiveChatMessages(user, activeChatTarget);
+        });
+    }
+
+    function triggerHeartbeatAnimation() {
+        const pane = document.querySelector('.chat-window-pane');
+        if (!pane) return;
+
+        // Create 15 floating icons
+        const numHearts = 15;
+        const iconArray = ['💖', '✨', '💕', '🌸'];
+
+        for(let i=0; i<numHearts; i++) {
+            let heart = document.createElement('div');
+            heart.className = 'floating-heart';
+            heart.innerText = iconArray[Math.floor(Math.random() * iconArray.length)];
+            
+            // Randomize starting positions and speeds
+            heart.style.left = (Math.random() * 80 + 10) + '%';
+            heart.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+            heart.style.fontSize = (Math.random() * 15 + 15) + 'px';
+            
+            pane.appendChild(heart);
+            setTimeout(() => heart.remove(), 4500); // Clean up DOM
+        }
+
+        // Tap into the device's native vibration motor!
+        if (navigator.vibrate) {
+            navigator.vibrate([40, 80, 40]); // A soft, double-tap heartbeat feel
+        }
     }
 
     // --- NEW: MONITORS SCROLL DEPTH TO TOGGLE FLOATING BUTTON VIEW STATUS ---
