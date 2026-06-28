@@ -345,7 +345,7 @@
     const activeChatChime = new Audio('tune2.mp3'); 
     let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer, lastSyncPayload = ""; 
 
-    // --- NEW: DIRECTORY TAB LOGIC WITH SMOOTH ANIMATION ---
+    // --- NEW: DIRECTORY TAB LOGIC WITH LATENCY MANAGEMENT ---
     let currentDirectoryTab = 'connected';
 
     function switchDirectoryTab(tab) {
@@ -367,11 +367,21 @@
         // 1. Trigger the fade-out and slide-down animation
         if (listContainer) listContainer.classList.add('tab-switching');
         
-        // 2. Wait exactly 200ms (matching our CSS), then load new data and fade back in
+        // 2. Wait 200ms for fade out, then ask the server for data and WAIT for it
         setTimeout(() => {
-            lastSyncPayload = ""; 
-            syncCycle();
-            if (listContainer) listContainer.classList.remove('tab-switching');
+            // Passing 'true' tells syncCycle to forcefully redraw the UI
+            const syncPromise = syncCycle(true);
+            if (syncPromise) {
+                syncPromise.then(() => {
+                    // Only fade back in AFTER the new data is fully drawn on screen!
+                    if (listContainer) listContainer.classList.remove('tab-switching');
+                }).catch(() => {
+                    // Fallback just in case the network fails
+                    if (listContainer) listContainer.classList.remove('tab-switching');
+                });
+            } else {
+                if (listContainer) listContainer.classList.remove('tab-switching');
+            }
         }, 200);
     }
     
@@ -460,16 +470,17 @@
         refreshLoop = setInterval(syncCycle, 2000); 
     }
 
-    function syncCycle() {
+    function syncCycle(forceRender = false) {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
 
-        fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
+        // Return the fetch promise so the tab animation can wait for the network to finish!
+        return fetch(`${backendBaseUrl}/api/users?viewer=${encodeURIComponent(user)}`)
             .then(res => res.text())
             .then(rawText => {
                 if(!rawText || rawText.trim() === "") return;
 
-                // --- FLICKER FIX: Skip UI rebuilding if the exact same data arrives ---
-                let dataChanged = (rawText !== lastSyncPayload);
+                // --- FLICKER FIX: Incorporate the forceRender flag ---
+                let dataChanged = (rawText !== lastSyncPayload) || forceRender;
                 lastSyncPayload = rawText;
 
                 const payloadParts = rawText.split('|||');
@@ -493,7 +504,6 @@
                         const unreadCount = parseInt(parts[2].trim(), 10);
                         const relationshipStatus = parts[3].trim();
                         
-                        // --- DP FIX: Prevent double URL strings causing broken images ---
                         let customAvatarPic = parts[4] && parts[4].trim() !== "NONE" ? parts[4].trim() : "NONE";
                         if (customAvatarPic !== "NONE" && !customAvatarPic.startsWith("data:") && !customAvatarPic.startsWith("http")) {
                             customAvatarPic = "data:image/jpeg;base64," + customAvatarPic;
@@ -519,18 +529,17 @@
 
                         if (cleanName === activeChatTarget) updateHeaderUserStatusIndicator(isOnline);
 
-                        // --- NEW: TAB FILTERING LOGIC ---
+                        // --- TAB FILTERING LOGIC ---
                         let shouldRender = false;
                         if (currentDirectoryTab === 'connected' && relationshipStatus === "CONNECTED") shouldRender = true;
                         if (currentDirectoryTab === 'new' && relationshipStatus !== "CONNECTED") shouldRender = true;
                         
-                        if (!shouldRender) return; // Skip drawing this row if it doesn't match the active tab
+                        if (!shouldRender) return; 
 
                         const row = document.createElement('div');
                         row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
                         row.dataset.avatarData = customAvatarPic;
                         
-                        // Only let the row be clickable if they are actually connected
                         if (relationshipStatus === "CONNECTED") {
                             row.onclick = () => openTargetChatWindow(cleanName);
                         } else {
@@ -583,7 +592,7 @@
             }
         });
     }
-
+    
     function deleteUserAccount(target) {
         if (!confirm(`WARNING: Completely delete ${target} and all their chat data?`)) return;
         const admin = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
