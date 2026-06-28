@@ -223,7 +223,13 @@
         </div>
 
         <hr style="border-color: #ad3b72; margin: 15px 0;">
-        <h4>Available Directory</h4>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-right: 5px;">
+            <h4 style="margin: 0; color: #7a1029; font-size: 15px;">Directory</h4>
+            <div style="display: flex; gap: 4px; background: #e6c7c3; padding: 4px; border-radius: 8px;">
+                <button id="tabConnectedBtn" onclick="switchDirectoryTab('connected')" style="background: #fb9fa3; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;">Connected</button>
+                <button id="tabNewBtn" onclick="switchDirectoryTab('new')" style="background: transparent; color: #7a1029; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;">Discover</button>
+            </div>
+        </div>
         <div id="userListContainer"></div>
     </div>
 
@@ -327,6 +333,27 @@
     const backgroundChime = new Audio('tune1.mp3'); 
     const activeChatChime = new Audio('tune2.mp3'); 
     let refreshLoop = null, currentInviteSender = null, isSignUpMode = false, activeChatTarget = null, currentLoadedMessageCount = 0, typingTimer, lastSyncPayload = ""; 
+
+    // --- NEW: DIRECTORY TAB LOGIC ---
+    let currentDirectoryTab = 'connected';
+
+    function switchDirectoryTab(tab) {
+        currentDirectoryTab = tab;
+        const btnConnected = document.getElementById('tabConnectedBtn');
+        const btnNew = document.getElementById('tabNewBtn');
+        
+        if (tab === 'connected') {
+            btnConnected.style.background = '#fb9fa3'; btnConnected.style.color = 'white';
+            btnNew.style.background = 'transparent'; btnNew.style.color = '#7a1029';
+        } else {
+            btnNew.style.background = '#fb9fa3'; btnNew.style.color = 'white';
+            btnConnected.style.background = 'transparent'; btnConnected.style.color = '#7a1029';
+        }
+        
+        // Force the list to rebuild instantly so it feels snappy!
+        lastSyncPayload = ""; 
+        syncCycle();
+    }
 
     // --- E2EE SCRAMBLER ENGINE (EMOJI SAFE) ---
     function encryptE2E(text, key) {
@@ -472,10 +499,23 @@
 
                         if (cleanName === activeChatTarget) updateHeaderUserStatusIndicator(isOnline);
 
+                        // --- NEW: TAB FILTERING LOGIC ---
+                        let shouldRender = false;
+                        if (currentDirectoryTab === 'connected' && relationshipStatus === "CONNECTED") shouldRender = true;
+                        if (currentDirectoryTab === 'new' && relationshipStatus !== "CONNECTED") shouldRender = true;
+                        
+                        if (!shouldRender) return; // Skip drawing this row if it doesn't match the active tab
+
                         const row = document.createElement('div');
                         row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #febeba; padding: 10px; border-radius: 8px; cursor: pointer;";
                         row.dataset.avatarData = customAvatarPic;
-                        row.onclick = () => openTargetChatWindow(cleanName);
+                        
+                        // Only let the row be clickable if they are actually connected
+                        if (relationshipStatus === "CONNECTED") {
+                            row.onclick = () => openTargetChatWindow(cleanName);
+                        } else {
+                            row.style.cursor = "default";
+                        }
 
                         const ringClass = activeStatuses.includes(cleanName) ? "moment-ring" : "";
                         const statusClass = isOnline ? "status-online" : "status-offline";
