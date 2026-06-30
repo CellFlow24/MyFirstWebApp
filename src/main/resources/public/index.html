@@ -198,6 +198,31 @@
             opacity: 0;
             transform: translateY(10px);
         }
+
+        /* --- NEW: DARK MODE STYLES (NIGHT MODE) --- */
+        body.dark-mode { background-color: #1e293b; color: #cbd5e1; }
+        body.dark-mode .app-card, 
+        body.dark-mode .lounge-sidebar, 
+        body.dark-mode .lounge-main, 
+        body.dark-mode .chat-window-pane, 
+        body.dark-mode .chat-header-bar, 
+        body.dark-mode .modal-box { 
+            background-color: #0f172a !important; 
+            color: #f8fafc; 
+            border-color: #334155 !important; 
+        }
+        body.dark-mode .chat-footer-input-bar { background-color: #1e293b !important; border-color: #334155 !important; }
+        body.dark-mode textarea#msgInputField { background-color: #334155 !important; color: #f8fafc !important; border-color: #475569 !important; }
+        body.dark-mode .msg-outgoing { background: linear-gradient(135deg, #475569 0%, #334155 100%) !important; color: white !important; border: 1px solid #64748b; }
+        body.dark-mode .msg-incoming { background: linear-gradient(135deg, #7a1029 0%, #be123c 100%) !important; color: white !important; }
+        body.dark-mode #userListContainer > div { background: #1e293b !important; border: 1px solid #334155; }
+        body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .header-profile-title { color: #f8fafc !important; }
+        
+        /* THE MAGIC BACKGROUND SWAP */
+        body.dark-mode .chat-log-display { 
+            background: url('dc2.png') repeat center center !important; 
+            background-size: cover !important; 
+        }
         
     </style>
     <link rel="manifest" href="/manifest.json">
@@ -225,10 +250,16 @@
                 <div class="sidebar-dp-avatar" id="myProfileAvatarElement" style="width:70px; height:70px; font-size:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">👤</div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 6px;">
-                <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
-                <div style="display: flex; gap: 6px;">
-                    <button onclick="openMomentCreator()" style="background: #fb9fa3; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;" title="Share a beautiful moment...">📢 Moments</button>
-                    <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#fb9fa3'" onmouseout="this.style.background='#ffc8b0'">🚪 Logout</button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
+                    <!-- The Unique Recovery ID Badge -->
+                    <span id="userRecoveryId" style="background: #e6c7c3; color: #7a1029; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; border: 1px solid #fb9fa3;">#XXXXX</span>
+                </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                    <button onclick="openMomentCreator()" style="background: #fb9fa3; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">📢 Moments</button>
+                    <!-- Settings Button -->
+                    <button onclick="openSettingsMenu()" style="background: #aad052; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">⚙️ Settings</button>
+                    <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">🚪 Logout</button>
                 </div>
             </div>
         </div>
@@ -265,6 +296,33 @@
         <div class="modal-actions" style="margin-top: 10px;">
             <button class="btn-accept" style="background: #fb9fa3; color: #7a1029;" onclick="document.getElementById('momentMediaUploader').click()">📸 Pick Image</button>
             <button class="btn-decline" onclick="document.getElementById('momentCreatorModal').classList.remove('active')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings & Security Modal -->
+<div id="settingsMenuModal" class="modal-overlay">
+    <div class="modal-box" style="text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #aad052;">⚙️ Account Settings</h3>
+            <!-- Theme Toggle Button -->
+            <button onclick="toggleAppTheme()" id="themeToggleBtn" style="background: none; border: none; font-size: 26px; cursor: pointer; padding: 0;" title="Toggle Day/Night Mode">☀️</button>
+        </div>
+        
+        <hr style="border-top: 1px dashed #aad052; margin: 15px 0;">
+        
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">🔐 Change Password</h4>
+        <input type="password" id="settingOldPass" placeholder="Current Password" class="login-field" style="margin-bottom: 8px; padding: 10px;">
+        <input type="password" id="settingNewPass" placeholder="New Password" class="login-field" style="padding: 10px;">
+        <button class="sync-btn" style="padding: 10px; font-size: 13px; margin-bottom: 20px;" onclick="submitPasswordChange()">Update Password</button>
+
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">💔 Manage Connections</h4>
+        <div id="settingsConnectionsList" style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 10px; max-height: 120px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #e6c7c3;">
+            <!-- JavaScript will populate active friends here -->
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-decline" style="width: 100%;" onclick="document.getElementById('settingsMenuModal').classList.remove('active')">Close Menu</button>
         </div>
     </div>
 </div>
@@ -795,7 +853,7 @@
                         </div>
                     </div>
 
-                    <div class="chat-log-display" id="chatLogDisplay" onscroll="handleChatLogScroll()" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; background: url('dc.png') repeat center center; background-size: cover; width: 100%; box-sizing: border-box;"></div>
+                    <div class="chat-log-display" id="chatLogDisplay" onscroll="handleChatLogScroll()" style="flex:1; padding:20px; overflow-y:auto; overflow-x:hidden; width: 100%; box-sizing: border-box;"></div>
 
                     <button id="scrollToBottomFloatingBtn" class="scroll-bottom-btn" onclick="snapChatToBottom()">▼</button>
 
@@ -1521,6 +1579,73 @@
     document.querySelector('#installPromptModal .btn-decline, #installPromptModal button[onclick*="remove(\'active\')"]').addEventListener('click', () => {
         localStorage.setItem('dipsum_install_dismissed', 'true');
     });
+
+    // --- NEW: SETTINGS & THEME ENGINE ---
+    
+    // 1. Check Memory on Load
+    window.addEventListener('DOMContentLoaded', () => {
+        if (localStorage.getItem('dipsum_dark_mode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+    });
+
+    function toggleAppTheme() {
+        const body = document.body;
+        body.classList.toggle('dark-mode');
+        const isDark = body.classList.contains('dark-mode');
+        
+        // Save to browser memory
+        localStorage.setItem('dipsum_dark_mode', isDark);
+        
+        // Update the icon
+        document.getElementById('themeToggleBtn').innerText = isDark ? '🌑' : '☀️';
+    }
+
+    function openSettingsMenu() {
+        document.getElementById('settingsMenuModal').classList.add('active');
+        
+        // Set the correct icon state when opened
+        const isDark = document.body.classList.contains('dark-mode');
+        document.getElementById('themeToggleBtn').innerText = isDark ? '🌑' : '☀️';
+        
+        // Clear password fields
+        document.getElementById('settingOldPass').value = '';
+        document.getElementById('settingNewPass').value = '';
+        
+        populateSettingsConnections();
+    }
+
+    function populateSettingsConnections() {
+        const listDiv = document.getElementById('settingsConnectionsList');
+        listDiv.innerHTML = '';
+        const rows = document.getElementById('userListContainer').querySelectorAll('.status-dot');
+        let friendsCount = 0;
+        
+        rows.forEach(dot => {
+            const name = dot.nextElementSibling.nextElementSibling.innerText.trim();
+            if(dot.parentElement.nextElementSibling.innerText.includes("Connected")) {
+                listDiv.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #e6c7c3;">
+                        <span style="font-weight: bold; font-size: 14px;">${capitalizeFirstLetter(name)}</span>
+                        <button onclick="removeConnection('${name}')" style="background: transparent; border: 1px solid #ffc8b0; color: #7a1029; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;">💔 Unfriend</button>
+                    </div>`;
+                friendsCount++;
+            }
+        });
+        
+        if (friendsCount === 0) {
+            listDiv.innerHTML = "<p style='font-size:12px; color:#7a1029; font-style: italic; text-align: center;'>No connections yet.</p>";
+        }
+    }
+
+    // Placeholder functions for Step 2
+    function submitPasswordChange() {
+        displaySystemAlert("Coming Soon", "The security update will be active in Step 2!", "⏳");
+    }
+    
+    function removeConnection(targetUser) {
+        displaySystemAlert("Coming Soon", "The unfriend logic will be active in Step 2!", "⏳");
+    }
 
 </script>
 <script>
