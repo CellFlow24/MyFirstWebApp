@@ -408,18 +408,19 @@
     </div>
 </div>
 
-<div id="unfriendConfirmModal" class="modal-overlay">
+<!-- Custom Action Confirmation Modal -->
+<div id="actionConfirmModal" class="modal-overlay">
     <div class="modal-box">
-        <div style="font-size: 35px; margin-bottom: 10px;">💔</div>
-        <h3 style="margin: 0 0 10px 0; color: #7a1029;">Unfriend User</h3>
-        <p style="margin: 0 0 20px 0; font-size: 14px; color: #555;" id="unfriendConfirmMessage">Are you sure?</p>
+        <div style="font-size: 35px; margin-bottom: 10px;" id="actionConfirmIcon">⚠️</div>
+        <h3 style="margin: 0 0 10px 0; color: #7a1029;" id="actionConfirmTitle">Confirm Action</h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px; color: #555;" id="actionConfirmMessage">Are you sure?</p>
         <div class="modal-actions">
-            <button class="btn-decline" onclick="executeUnfriendAction(true)" style="background: #e11d48; color: white;">Yes, Unfriend</button>
-            <button class="btn-accept" onclick="executeUnfriendAction(false)" style="background: #94a3b8; color: white;">Cancel</button>
+            <button class="btn-decline" onclick="executeConfirmedAction(true)" style="background: #e11d48; color: white;" id="actionConfirmBtn">Yes, Do it</button>
+            <button class="btn-accept" onclick="executeConfirmedAction(false)" style="background: #94a3b8; color: white;">Cancel</button>
         </div>
     </div>
 </div>
-
+    
 <script>
     const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
     let totalUnreadMessagesTracked = 0;
@@ -519,13 +520,20 @@
         if (!user || !pass) return displaySystemAlert("Missing Info", "Fill both fields.", "🚫");
 
         const btn = document.getElementById('authBtn');
+        if (btn.disabled) return; // FIX: Prevent double-taps from causing false offline alerts!
+        
         const initialText = btn.innerText;
         btn.innerText = "Processing...";
+        btn.disabled = true; // Lock the button
 
         let targetUrl = `${backendBaseUrl}/api/${isSignUpMode ? 'register' : 'login'}?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+        
         fetch(targetUrl).then(res => res.text()).then(data => {
             btn.innerText = initialText;
+            btn.disabled = false; // Unlock the button
+            
             if (data.startsWith("SUCCESS")) {
+                document.getElementById('systemAlertModal').classList.remove('active'); // Hide any lingering alerts instantly
                 if (isSignUpMode) {
                     displaySystemAlert("Success", "Account created!", "✨");
                     toggleAuthMode();
@@ -537,8 +545,14 @@
                     startAppSynchronization();
                     setupPushNotifications(user.toLowerCase());
                 }
-            } else displaySystemAlert("Failure", data, "❌");
-        }).catch(() => displaySystemAlert("Offline", "Could not connect to backend.", "📡"));
+            } else {
+                displaySystemAlert("Failure", data, "❌");
+            }
+        }).catch(() => {
+            btn.innerText = initialText;
+            btn.disabled = false; // Unlock the button
+            displaySystemAlert("Offline", "Could not connect to backend.", "📡");
+        });
     }
 
     function executeAppLogout() {
@@ -679,13 +693,6 @@
             });
     }
     
-    function deleteUserAccount(target) {
-        if (!confirm(`WARNING: Completely delete ${target} and all their chat data?`)) return;
-        const admin = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-        fetch(`${backendBaseUrl}/api/deleteUser?admin=${encodeURIComponent(admin)}&target=${encodeURIComponent(target)}`).then(res => res.text()).then(r => {
-            if (r === "DELETED") { if(activeChatTarget === target) exitActiveMobileChatView(); syncCycle(); }
-        });
-    }
 
     // --- MOMENTS ENGINE ---
     function openMomentCreator() {
@@ -1662,46 +1669,6 @@
         displaySystemAlert("Coming Soon", "The security update will be active in Step 2!", "⏳");
     }
     
-    // --- NEW UNFRIEND CONFIRMATION LOGIC ---
-    let pendingUnfriendTarget = null;
-
-    function removeConnection(targetUser) {
-        // Store the target and open the custom modal instead of the ugly browser alert
-        pendingUnfriendTarget = targetUser;
-        document.getElementById('unfriendConfirmMessage').innerHTML = `Are you sure you want to completely unfriend <b>${capitalizeFirstLetter(targetUser)}</b>?`;
-        document.getElementById('unfriendConfirmModal').classList.add('active');
-    }
-
-    function executeUnfriendAction(proceed) {
-        // Close the modal
-        document.getElementById('unfriendConfirmModal').classList.remove('active');
-        
-        // If they clicked Cancel, stop here
-        if (!proceed || !pendingUnfriendTarget) {
-            pendingUnfriendTarget = null;
-            return;
-        }
-
-        const targetUser = pendingUnfriendTarget;
-        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-        
-        fetch(`${backendBaseUrl}/api/unfriend?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUser)}`)
-            .then(res => res.text())
-            .then(response => {
-                if (response === "SUCCESS") {
-                    displaySystemAlert("Unfriended", `You are no longer connected with ${capitalizeFirstLetter(targetUser)}.`, "💔");
-                    populateSettingsConnections(); // Instantly update the settings list
-                    syncCycle(true); // Instantly update the main screen
-                    
-                    // Kick them out of the chat view if they are currently talking to that person
-                    if (activeChatTarget === targetUser) {
-                        exitActiveMobileChatView();
-                    }
-                }
-                pendingUnfriendTarget = null; // Reset the tracker
-            });
-    }
-
     // --- CONNECTED SETTINGS & SECURITY LOGIC ---
     
     function fetchAndDisplayRecoveryId() {
@@ -1734,28 +1701,71 @@
                 }
             });
     }
-    
+
+    // --- CUSTOM CONFIRMATION LOGIC FOR UNFRIEND & DELETE ---
+    let pendingActionType = null;
+    let pendingActionTarget = null;
+
     function removeConnection(targetUser) {
-        if (!confirm(`Are you sure you want to completely unfriend ${capitalizeFirstLetter(targetUser)}?`)) return;
-        
-        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
-        
-        fetch(`${backendBaseUrl}/api/unfriend?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUser)}`)
-            .then(res => res.text())
-            .then(response => {
-                if (response === "SUCCESS") {
-                    displaySystemAlert("Unfriended", `You are no longer connected with ${capitalizeFirstLetter(targetUser)}.`, "💔");
-                    populateSettingsConnections(); // Instantly update the modal list
-                    syncCycle(true); // Instantly update the main screen
-                    
-                    // Kick them out of the chat view if they are currently talking to that person!
-                    if (activeChatTarget === targetUser) {
-                        exitActiveMobileChatView();
-                    }
-                }
-            });
+        pendingActionType = 'unfriend';
+        pendingActionTarget = targetUser;
+        document.getElementById('actionConfirmIcon').innerText = '💔';
+        document.getElementById('actionConfirmTitle').innerText = 'Unfriend User';
+        document.getElementById('actionConfirmMessage').innerHTML = `Are you sure you want to completely unfriend <b>${capitalizeFirstLetter(targetUser)}</b>?`;
+        document.getElementById('actionConfirmBtn').innerText = 'Yes, Unfriend';
+        document.getElementById('actionConfirmModal').classList.add('active');
     }
 
+    function deleteUserAccount(targetUser) {
+        pendingActionType = 'delete';
+        pendingActionTarget = targetUser;
+        document.getElementById('actionConfirmIcon').innerText = '🗑️';
+        document.getElementById('actionConfirmTitle').innerText = 'Delete Account';
+        document.getElementById('actionConfirmMessage').innerHTML = `WARNING: Completely wipe <b>${capitalizeFirstLetter(targetUser)}</b> and all their chat data?`;
+        document.getElementById('actionConfirmBtn').innerText = 'Yes, Delete';
+        document.getElementById('actionConfirmModal').classList.add('active');
+    }
+
+    function executeConfirmedAction(proceed) {
+        document.getElementById('actionConfirmModal').classList.remove('active');
+        
+        if (!proceed || !pendingActionTarget) {
+            pendingActionType = null;
+            pendingActionTarget = null;
+            return;
+        }
+
+        const targetUser = pendingActionTarget;
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+
+        if (pendingActionType === 'unfriend') {
+            fetch(`${backendBaseUrl}/api/unfriend?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUser)}`)
+                .then(res => res.text())
+                .then(response => {
+                    if (response === "SUCCESS") {
+                        displaySystemAlert("Unfriended", `You are no longer connected with ${capitalizeFirstLetter(targetUser)}.`, "💔");
+                        populateSettingsConnections(); 
+                        syncCycle(true); 
+                        if (activeChatTarget === targetUser) exitActiveMobileChatView();
+                    }
+                });
+        } else if (pendingActionType === 'delete') {
+            fetch(`${backendBaseUrl}/api/deleteUser?admin=${encodeURIComponent(user)}&target=${encodeURIComponent(targetUser)}`)
+                .then(res => res.text())
+                .then(r => {
+                    if (r === "DELETED") { 
+                        displaySystemAlert("Deleted", `${capitalizeFirstLetter(targetUser)} has been wiped from the server.`, "🗑️");
+                        syncCycle(true);
+                        if(activeChatTarget === targetUser) exitActiveMobileChatView(); 
+                    }
+                });
+        }
+        
+        pendingActionType = null;
+        pendingActionTarget = null;
+    }
+
+    
 </script>
 <script>
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW failed:', err));
