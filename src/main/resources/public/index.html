@@ -326,6 +326,19 @@
         </div>
     </div>
 </div>
+    
+<!-- Custom App Install Prompt Modal -->
+<div id="installPromptModal" class="modal-overlay">
+    <div class="modal-box" style="text-align: center; background: #fdf8ef;">
+        <div style="font-size: 45px; margin-bottom: 10px;">✨📱</div>
+        <h3 style="margin-top: 0; color: #aad052;">Install Dipsum</h3>
+        <p style="font-size: 14px; color: #555; margin-bottom: 20px;">Get the full experience! Install Dipsum on your home screen for full-screen chatting and instant access.</p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="btnInstallApp" class="sync-btn" style="background: #aad052; color: white;">📥 Install App</button>
+            <button onclick="document.getElementById('installPromptModal').classList.remove('active')" style="background: transparent; border: 1px solid #ffc8b0; padding: 10px; border-radius: 8px; color: #7a1029; font-weight: bold; cursor: pointer;">🌐 Use in Browser</button>
+        </div>
+    </div>
+</div>
 
 <!-- Time Capsule Full Screen Cinematic Reveal -->
 <div id="capsuleDisplayOverlay">
@@ -1465,6 +1478,41 @@
             playNextCapsule(); // Play next if multiple unlocked at once
         }, 1000);
     }
+
+    // --- NEW: PWA CUSTOM INSTALL PROMPT ---
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome's default mini-infobar from appearing
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        
+        // Show our beautiful custom modal after a short delay
+        setTimeout(() => {
+            const installModal = document.getElementById('installPromptModal');
+            if (installModal && !localStorage.getItem('dipsum_install_dismissed')) {
+                installModal.classList.add('active');
+            }
+        }, 1500);
+    });
+
+    document.getElementById('btnInstallApp').addEventListener('click', async () => {
+        document.getElementById('installPromptModal').classList.remove('active');
+        if (deferredPrompt) {
+            // Show the native Android install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            deferredPrompt = null;
+        }
+    });
+
+    // If they click "Use in Browser", remember it so we don't annoy them again
+    document.querySelector('#installPromptModal .btn-decline, #installPromptModal button[onclick*="remove(\'active\')"]').addEventListener('click', () => {
+        localStorage.setItem('dipsum_install_dismissed', 'true');
+    });
 
 </script>
 <script>
