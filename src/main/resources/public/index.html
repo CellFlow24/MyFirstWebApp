@@ -500,11 +500,24 @@
             document.getElementById('loginCard').style.display = 'none';
             document.getElementById('chatLounge').style.display = 'flex';
             document.getElementById('currentProfileName').innerText = savedSessionUser.toLowerCase();
-            startAppSynchronization();
-            setupPushNotifications(savedSessionUser.toLowerCase());
+            
+            // Safely start sync without crashing
+            try { startAppSynchronization(); } catch(e) { console.error(e); }
+            
+            // Safely check for push notifications without triggering false errors
+            try {
+                if (typeof setupPushNotifications === 'function') {
+                    setupPushNotifications(savedSessionUser.toLowerCase());
+                }
+            } catch(e) { console.error("Push notification setup skipped."); }
+        }
+        
+        // 1. Check Memory on Load for Dark Mode
+        if (localStorage.getItem('dipsum_dark_mode') === 'true') {
+            document.body.classList.add('dark-mode');
         }
     });
-
+    
     function toggleAuthMode() {
         isSignUpMode = !isSignUpMode;
         document.getElementById('authTitle').innerText = isSignUpMode ? "Create New Account" : "Your Secure Chat Portal";
@@ -520,7 +533,7 @@
         if (!user || !pass) return displaySystemAlert("Missing Info", "Fill both fields.", "🚫");
 
         const btn = document.getElementById('authBtn');
-        if (btn.disabled) return; // FIX: Prevent double-taps from causing false offline alerts!
+        if (btn.disabled) return; // Prevent double-taps
         
         const initialText = btn.innerText;
         btn.innerText = "Processing...";
@@ -528,31 +541,45 @@
 
         let targetUrl = `${backendBaseUrl}/api/${isSignUpMode ? 'register' : 'login'}?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
         
-        fetch(targetUrl).then(res => res.text()).then(data => {
-            btn.innerText = initialText;
-            btn.disabled = false; // Unlock the button
-            
-            if (data.startsWith("SUCCESS")) {
-                document.getElementById('systemAlertModal').classList.remove('active'); // Hide any lingering alerts instantly
-                if (isSignUpMode) {
-                    displaySystemAlert("Success", "Account created!", "✨");
-                    toggleAuthMode();
+        fetch(targetUrl)
+            .then(res => {
+                if (!res.ok) throw new Error("Network Response Error");
+                return res.text();
+            })
+            .then(data => {
+                btn.innerText = initialText;
+                btn.disabled = false; // Unlock the button
+                
+                if (data.startsWith("SUCCESS")) {
+                    document.getElementById('systemAlertModal').classList.remove('active'); 
+                    if (isSignUpMode) {
+                        displaySystemAlert("Success", "Account created!", "✨");
+                        toggleAuthMode();
+                    } else {
+                        localStorage.setItem('dipsum_logged_user', user.toLowerCase());
+                        document.getElementById('loginCard').style.display = 'none';
+                        document.getElementById('chatLounge').style.display = 'flex';
+                        document.getElementById('currentProfileName').innerText = user.toLowerCase();
+                        
+                        // Isolate these calls so they NEVER trigger the Offline alert!
+                        try { startAppSynchronization(); } catch (e) { console.error(e); }
+                        try { 
+                            if (typeof setupPushNotifications === 'function') {
+                                setupPushNotifications(user.toLowerCase()); 
+                            }
+                        } catch (e) { console.error("Push notification setup skipped."); }
+                    }
                 } else {
-                    localStorage.setItem('dipsum_logged_user', user.toLowerCase());
-                    document.getElementById('loginCard').style.display = 'none';
-                    document.getElementById('chatLounge').style.display = 'flex';
-                    document.getElementById('currentProfileName').innerText = user.toLowerCase();
-                    startAppSynchronization();
-                    setupPushNotifications(user.toLowerCase());
+                    displaySystemAlert("Failure", data, "❌");
                 }
-            } else {
-                displaySystemAlert("Failure", data, "❌");
-            }
-        }).catch(() => {
-            btn.innerText = initialText;
-            btn.disabled = false; // Unlock the button
-            displaySystemAlert("Offline", "Could not connect to backend.", "📡");
-        });
+            })
+            .catch((error) => {
+                // This will now ONLY trigger if the server is actually down!
+                console.error("Login Error:", error);
+                btn.innerText = initialText;
+                btn.disabled = false; 
+                displaySystemAlert("Offline", "Could not connect to backend.", "📡");
+            });
     }
 
     function executeAppLogout() {
