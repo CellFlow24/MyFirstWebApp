@@ -408,6 +408,18 @@
     </div>
 </div>
 
+<div id="unfriendConfirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div style="font-size: 35px; margin-bottom: 10px;">💔</div>
+        <h3 style="margin: 0 0 10px 0; color: #7a1029;">Unfriend User</h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px; color: #555;" id="unfriendConfirmMessage">Are you sure?</p>
+        <div class="modal-actions">
+            <button class="btn-decline" onclick="executeUnfriendAction(true)" style="background: #e11d48; color: white;">Yes, Unfriend</button>
+            <button class="btn-accept" onclick="executeUnfriendAction(false)" style="background: #94a3b8; color: white;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
     let totalUnreadMessagesTracked = 0;
@@ -1194,18 +1206,25 @@
     }
 
     function handleChatKeyDown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); triggerMessageDispatch(); } }
+    
     function displaySystemAlert(title, message, icon = "⚠️") {
-        document.getElementById('sysAlertIcon').innerText = icon; document.getElementById('sysAlertTitle').innerText = title;
-        document.getElementById('sysAlertText').innerText = message; document.getElementById('systemAlertModal').style.display = 'flex';
+        document.getElementById('sysAlertIcon').innerText = icon; 
+        document.getElementById('sysAlertTitle').innerText = title;
+        document.getElementById('sysAlertText').innerText = message; 
+        
+        // FIX: Now uses the .active class so the CSS animation actually fades it in!
+        document.getElementById('systemAlertModal').classList.add('active'); 
     }
+    
     function dismissCustomSystemAlert() {
-        document.getElementById('systemAlertModal').style.display = 'none';
+        document.getElementById('systemAlertModal').classList.remove('active');
         if (document.getElementById('chatLounge').style.display !== 'flex') {
             localStorage.removeItem('dipsum_logged_user');
             document.getElementById('loginCard').style.display = 'block';
             if (document.getElementById('authBtn')) document.getElementById('authBtn').innerText = "Access Account";
         }
     }
+    
     function capitalizeFirstLetter(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ""; }
 
     function executeOwnProfilePicUpload(fileInput) {
@@ -1643,8 +1662,44 @@
         displaySystemAlert("Coming Soon", "The security update will be active in Step 2!", "⏳");
     }
     
+    // --- NEW UNFRIEND CONFIRMATION LOGIC ---
+    let pendingUnfriendTarget = null;
+
     function removeConnection(targetUser) {
-        displaySystemAlert("Coming Soon", "The unfriend logic will be active in Step 2!", "⏳");
+        // Store the target and open the custom modal instead of the ugly browser alert
+        pendingUnfriendTarget = targetUser;
+        document.getElementById('unfriendConfirmMessage').innerHTML = `Are you sure you want to completely unfriend <b>${capitalizeFirstLetter(targetUser)}</b>?`;
+        document.getElementById('unfriendConfirmModal').classList.add('active');
+    }
+
+    function executeUnfriendAction(proceed) {
+        // Close the modal
+        document.getElementById('unfriendConfirmModal').classList.remove('active');
+        
+        // If they clicked Cancel, stop here
+        if (!proceed || !pendingUnfriendTarget) {
+            pendingUnfriendTarget = null;
+            return;
+        }
+
+        const targetUser = pendingUnfriendTarget;
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        
+        fetch(`${backendBaseUrl}/api/unfriend?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUser)}`)
+            .then(res => res.text())
+            .then(response => {
+                if (response === "SUCCESS") {
+                    displaySystemAlert("Unfriended", `You are no longer connected with ${capitalizeFirstLetter(targetUser)}.`, "💔");
+                    populateSettingsConnections(); // Instantly update the settings list
+                    syncCycle(true); // Instantly update the main screen
+                    
+                    // Kick them out of the chat view if they are currently talking to that person
+                    if (activeChatTarget === targetUser) {
+                        exitActiveMobileChatView();
+                    }
+                }
+                pendingUnfriendTarget = null; // Reset the tracker
+            });
     }
 
     // --- CONNECTED SETTINGS & SECURITY LOGIC ---
