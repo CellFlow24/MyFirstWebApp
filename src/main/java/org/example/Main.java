@@ -34,6 +34,7 @@ public class Main {
         HashSet<String> establishedConnections = new HashSet<>();
         HashMap<String, Integer> unreadCounts = new HashMap<>();
         HashMap<String, ArrayList<String>> chatHistories = new HashMap<>();
+        HashMap<String, String> userRecoveryIds = new HashMap<>(); // NEW: Recovery ID storage
 
         Security.addProvider(new BouncyCastleProvider());
         try {
@@ -47,7 +48,7 @@ public class Main {
             e.printStackTrace();
         }
 
-        initializeDatabase(userDatabase, establishedConnections, chatHistories);
+        initializeDatabase(userDatabase, establishedConnections, chatHistories, userRecoveryIds);
 
         Javalin app = Javalin.create(config -> {
             config.staticFiles.add("/public", Location.CLASSPATH);
@@ -91,6 +92,11 @@ public class Main {
             } else {
                 userDatabase.put(user, pass);
                 saveUserToDatabase(user, pass);
+
+                // Generate and save unique #ID for new user
+                String newId = "#" + java.util.UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+                userRecoveryIds.put(user, newId);
+                saveRecoveryIdToDatabase(user, newId);
 
                 if (user != null && !user.equals("help")) {
                     establishedConnections.add(user + ":help");
@@ -164,6 +170,91 @@ public class Main {
             
             ctx.result(finalResult + "|||" + momentsData.toString());
         });
+
+        // --- NEW SECURITY & SETTINGS ENDPOINTS ---
+
+        app.get("/api/getRecoveryId", ctx -> {
+            String user = ctx.queryParam("user");
+            if (user != null) {
+                ctx.result(userRecoveryIds.getOrDefault(user.trim().toLowerCase(), "NONE"));
+            } else {
+                ctx.result("NONE");
+            }
+        });
+
+        app.get("/api/changePassword", ctx -> {
+            String user = ctx.queryParam("user");
+            String oldP = ctx.queryParam("old");
+            String newP = ctx.queryParam("new");
+            if (user != null && oldP != null && newP != null) {
+                String cleanUser = user.trim().toLowerCase();
+                if (oldP.equals(userDatabase.get(cleanUser))) {
+                    userDatabase.put(cleanUser, newP);
+                    saveUserToDatabase(cleanUser, newP);
+                    ctx.result("SUCCESS");
+                } else {
+                    ctx.result("FAIL: Incorrect current password.");
+                }
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        app.get("/api/unfriend", ctx -> {
+            String user1 = ctx.queryParam("user1");
+            String user2 = ctx.queryParam("user2");
+            if (user1 != null && user2 != null) {
+                String u1 = user1.trim().toLowerCase();
+                String u2 = user2.trim().toLowerCase();
+                establishedConnections.remove(u1 + ":" + u2);
+                establishedConnections.remove(u2 + ":" + u1);
+                
+                try (Connection conn = DriverManager.getConnection(DB_URL);
+                     PreparedStatement ps = conn.prepareStatement("DELETE FROM connections WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)")) {
+                    ps.setString(1, u1); ps.setString(2, u2);
+                    ps.setString(3, u2); ps.setString(4, u1);
+                    ps.executeUpdate();
+                } catch (SQLException e) {}
+                ctx.result("SUCCESS");
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        app.get("/api/recoverAccount", ctx -> {
+            String user = ctx.queryParam("user");
+            String recId = ctx.queryParam("recoveryId");
+            if (user != null && recId != null) {
+                String cleanUser = user.trim().toLowerCase();
+                if (recId.equalsIgnoreCase(userRecoveryIds.get(cleanUser))) {
+                    String tempPass = "123456";
+                    userDatabase.put(cleanUser, tempPass);
+                    saveUserToDatabase(cleanUser, tempPass);
+                    
+                    // Force inject an automated message from the Help account
+                    String helpUser = "help";
+                    String roomKey = (helpUser.compareTo(cleanUser) < 0) ? helpUser + "#" + cleanUser : cleanUser + "#" + helpUser;
+                    String plainMsg = "🔐 Account recovered. Please go to Settings ⚙️ right now to change your password.";
+                    long timestamp = System.currentTimeMillis();
+                    String contentPayloadToken = helpUser + ":" + plainMsg + "|~|" + timestamp;
+
+                    chatHistories.putIfAbsent(roomKey, new ArrayList<>());
+                    chatHistories.get(roomKey).add(contentPayloadToken);
+                    saveMessageToDatabase(roomKey, contentPayloadToken);
+
+                    String unreadTrackingKey = cleanUser + "#" + helpUser;
+                    unreadCounts.put(unreadTrackingKey, unreadCounts.getOrDefault(unreadTrackingKey, 0) + 1);
+                    
+                    ctx.result("SUCCESS: Temporary password is: " + tempPass);
+                } else {
+                    ctx.result("FAIL: Invalid Username or Recovery ID.");
+                }
+            } else {
+                ctx.result("FAIL");
+            }
+        });
+
+        // -----------------------------------------
 
         app.post("/api/uploadProfilePic", ctx -> {
             String user = ctx.queryParam("user");
@@ -384,6 +475,7 @@ public class Main {
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM subscriptions WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM connections WHERE user1 = ? OR user2 = ?")) { ps.setString(1, cleanTarget); ps.setString(2, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM moments WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM user_recovery WHERE username = ?")) { ps.setString(1, cleanTarget); ps.executeUpdate(); }
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE room_key LIKE ? OR room_key LIKE ?")) { 
                     ps.setString(1, cleanTarget + "#%"); 
                     ps.setString(2, "%#" + cleanTarget); 
@@ -396,6 +488,7 @@ public class Main {
             activeInvites.remove(cleanTarget);
             userProfilePics.remove(cleanTarget);
             userSubscriptions.remove(cleanTarget);
+            userRecoveryIds.remove(cleanTarget);
             
             establishedConnections.removeIf(c -> c.startsWith(cleanTarget + ":") || c.endsWith(":" + cleanTarget));
             chatHistories.keySet().removeIf(key -> key.startsWith(cleanTarget + "#") || key.endsWith("#" + cleanTarget));
@@ -449,7 +542,7 @@ public class Main {
         }
     }
 
-    private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories) {
+    private static void initializeDatabase(HashMap<String, String> userDatabase, HashSet<String> establishedConnections, HashMap<String, ArrayList<String>> chatHistories, HashMap<String, String> userRecoveryIds) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
             
@@ -459,6 +552,7 @@ public class Main {
             stmt.execute("CREATE TABLE IF NOT EXISTS profile_pics (username TEXT PRIMARY KEY, payload TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS subscriptions (username TEXT PRIMARY KEY, sub_json TEXT);");
             stmt.execute("CREATE TABLE IF NOT EXISTS moments (username TEXT PRIMARY KEY, targets TEXT, payload TEXT, timestamp INTEGER);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS user_recovery (username TEXT PRIMARY KEY, recovery_id TEXT);"); // NEW DB Table
 
             stmt.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('help', '1234');");
 
@@ -469,6 +563,20 @@ public class Main {
             while (rsConn.next()) {
                 establishedConnections.add(rsConn.getString("user1") + ":" + rsConn.getString("user2"));
                 establishedConnections.add(rsConn.getString("user2") + ":" + rsConn.getString("user1"));
+            }
+
+            ResultSet rsRec = stmt.executeQuery("SELECT username, recovery_id FROM user_recovery;");
+            while (rsRec.next()) userRecoveryIds.put(rsRec.getString("username"), rsRec.getString("recovery_id"));
+
+            // Retroactively generate missing #IDs for older users
+            for (String u : userDatabase.keySet()) {
+                if (!userRecoveryIds.containsKey(u)) {
+                    String newId = "#" + java.util.UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+                    userRecoveryIds.put(u, newId);
+                    try (PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO user_recovery VALUES (?, ?)")) {
+                        ps.setString(1, u); ps.setString(2, newId); ps.executeUpdate();
+                    }
+                }
             }
 
             // --- THE NEW 30-DAY AUTO-CLEANUP SWEEP ---
@@ -521,6 +629,13 @@ public class Main {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO users VALUES (?, ?)")) {
             ps.setString(1, u); ps.setString(2, p); ps.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+
+    private static void saveRecoveryIdToDatabase(String u, String id) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO user_recovery VALUES (?, ?)")) {
+            ps.setString(1, u); ps.setString(2, id); ps.executeUpdate();
         } catch (SQLException e) { System.err.println(e.getMessage()); }
     }
 
