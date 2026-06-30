@@ -915,16 +915,25 @@
 
                         text = decryptE2E(text, roomKey);
 
+                        // -- UPDATED: Heartbeat Intercept with Offline/Persistence Logic --
                         let isHeartbeat = false;
                         if (text.trim() === "[SYSTEM_HEARTBEAT]") {
                             isHeartbeat = true;
-                            if (sender !== currentUser && !isInitialLoad && !triggeredHeartbeatThisCycle) {
-                                triggerHeartbeatAnimation();
-                                triggeredHeartbeatThisCycle = true;
+                            if (sender !== currentUser && timestampMs > 0) {
+                                let hbStorageKey = "heartbeat_played_" + timestampMs;
+                                // If this heartbeat hasn't been played on this device yet
+                                if (!localStorage.getItem(hbStorageKey)) {
+                                    localStorage.setItem(hbStorageKey, "true");
+                                    // Fire the animation! Limit to 1 per load cycle so it doesn't spam if they missed 5 heartbeats
+                                    if (!triggeredHeartbeatThisCycle) {
+                                        setTimeout(triggerHeartbeatAnimation, 500);
+                                        triggeredHeartbeatThisCycle = true;
+                                    }
+                                }
                             }
                         }
 
-                        // -- NEW: Time Capsule Logic --
+                        // -- Time Capsule Logic --
                         let isCapsule = false;
                         let capsuleIsLocked = false;
                         const capsuleMatch = text.match(/\[CAPSULE:(\d+)\](.*)/s);
@@ -938,7 +947,6 @@
                                 text = "⏳ Locked Time Capsule";
                             } else {
                                 text = "✨ " + secretText;
-                                // Only trigger the cinematic reveal if they received it and haven't seen it yet
                                 if (sender !== currentUser && timestampMs > 0) {
                                     let storageKey = "capsule_played_" + timestampMs;
                                     if (!localStorage.getItem(storageKey)) {
