@@ -245,6 +245,9 @@
 <div id="chatLounge" class="lounge-container" style="display: none;">
     <div class="lounge-sidebar">
         <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
+            
+            <button onclick="openSettingsMenu()" style="position: absolute; right: 10px; top: 15px; background: none; border: none; font-size: 24px; cursor: pointer; transition: transform 0.3s ease;" onmouseover="this.style.transform='rotate(45deg)'" onmouseout="this.style.transform='rotate(0deg)'" title="Settings">⚙️</button>
+
             <input type="file" id="userProfilePicUploader" accept="image/*" style="display: none;" onchange="executeOwnProfilePicUpload(this)">
             <div id="currentUserAvatarWrapper" style="position: relative;" title="Your DP">
                 <div class="sidebar-dp-avatar" id="myProfileAvatarElement" style="width:70px; height:70px; font-size:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">👤</div>
@@ -252,14 +255,10 @@
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
-                    <!-- The Unique Recovery ID Badge -->
                     <span id="userRecoveryId" style="background: #e6c7c3; color: #7a1029; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; border: 1px solid #fb9fa3;">#XXXXX</span>
                 </div>
                 <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                     <button onclick="openMomentCreator()" style="background: #fb9fa3; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">📢 Moments</button>
-                    <!-- Settings Button -->
-                    <button onclick="openSettingsMenu()" style="background: #aad052; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">⚙️ Settings</button>
-                    <button onclick="executeAppLogout()" style="background: #ffc8b0; color: #334155; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">🚪 Logout</button>
                 </div>
             </div>
         </div>
@@ -305,7 +304,6 @@
     <div class="modal-box" style="text-align: left;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 style="margin: 0; color: #aad052;">⚙️ Account Settings</h3>
-            <!-- Theme Toggle Button -->
             <button onclick="toggleAppTheme()" id="themeToggleBtn" style="background: none; border: none; font-size: 26px; cursor: pointer; padding: 0;" title="Toggle Day/Night Mode">☀️</button>
         </div>
         
@@ -318,8 +316,9 @@
 
         <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">💔 Manage Connections</h4>
         <div id="settingsConnectionsList" style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 10px; max-height: 120px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #e6c7c3;">
-            <!-- JavaScript will populate active friends here -->
-        </div>
+            </div>
+
+        <button onclick="executeAppLogout()" class="sync-btn" style="background: #ffc8b0; color: #7a1029; width: 100%; margin-bottom: 10px;">🚪 Logout</button>
 
         <div class="modal-actions">
             <button class="btn-decline" style="width: 100%;" onclick="document.getElementById('settingsMenuModal').classList.remove('active')">Close Menu</button>
@@ -539,6 +538,7 @@
     function startAppSynchronization() {
         syncCycle();
         refreshLoop = setInterval(syncCycle, 2000); 
+        fetchAndDisplayRecoveryId();
     }
 
     function syncCycle(forceRender = false) {
@@ -1645,6 +1645,60 @@
     
     function removeConnection(targetUser) {
         displaySystemAlert("Coming Soon", "The unfriend logic will be active in Step 2!", "⏳");
+    }
+
+    // --- CONNECTED SETTINGS & SECURITY LOGIC ---
+    
+    function fetchAndDisplayRecoveryId() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        fetch(`${backendBaseUrl}/api/getRecoveryId?user=${encodeURIComponent(user)}`)
+            .then(res => res.text())
+            .then(id => {
+                if (id !== "NONE") {
+                    document.getElementById('userRecoveryId').innerText = id;
+                }
+            });
+    }
+
+    function submitPasswordChange() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        const oldP = document.getElementById('settingOldPass').value.trim();
+        const newP = document.getElementById('settingNewPass').value.trim();
+        
+        if(!oldP || !newP) return displaySystemAlert("Missing Info", "Please fill out both password fields.", "🚫");
+        
+        fetch(`${backendBaseUrl}/api/changePassword?user=${encodeURIComponent(user)}&old=${encodeURIComponent(oldP)}&new=${encodeURIComponent(newP)}`)
+            .then(res => res.text())
+            .then(response => {
+                if (response === "SUCCESS") {
+                    displaySystemAlert("Success", "Your password has been updated safely!", "✅");
+                    document.getElementById('settingOldPass').value = '';
+                    document.getElementById('settingNewPass').value = '';
+                } else {
+                    displaySystemAlert("Failed", response, "❌");
+                }
+            });
+    }
+    
+    function removeConnection(targetUser) {
+        if (!confirm(`Are you sure you want to completely unfriend ${capitalizeFirstLetter(targetUser)}?`)) return;
+        
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        
+        fetch(`${backendBaseUrl}/api/unfriend?user1=${encodeURIComponent(user)}&user2=${encodeURIComponent(targetUser)}`)
+            .then(res => res.text())
+            .then(response => {
+                if (response === "SUCCESS") {
+                    displaySystemAlert("Unfriended", `You are no longer connected with ${capitalizeFirstLetter(targetUser)}.`, "💔");
+                    populateSettingsConnections(); // Instantly update the modal list
+                    syncCycle(true); // Instantly update the main screen
+                    
+                    // Kick them out of the chat view if they are currently talking to that person!
+                    if (activeChatTarget === targetUser) {
+                        exitActiveMobileChatView();
+                    }
+                }
+            });
     }
 
 </script>
