@@ -235,6 +235,13 @@
     <p style="margin-top: 20px; font-size: 18px; color: #b31e41;" id="authDescription">Pull up a cushion and stay a while. 🧸</p>
     <input type="text" id="usernameInput" placeholder="Enter Username" class="login-field">
     <input type="password" id="passwordInput" placeholder="Enter Password" class="login-field">
+    
+    <!-- NEW: Terms & Conditions Checkbox (Hidden by default) -->
+    <div id="tncContainer" style="display: none; margin: 10px 0 15px 0; text-align: left; font-size: 13px; color: #7a1029; align-items: flex-start; gap: 8px;">
+        <input type="checkbox" id="tncCheckbox" style="margin-top: 2px; accent-color: #aad052; transform: scale(1.2); cursor: pointer;">
+        <label for="tncCheckbox" style="cursor: pointer; line-height: 1.4;">I have read and agree to the <span style="text-decoration: underline; font-weight: bold;" onclick="document.getElementById('termsModal').classList.add('active'); event.preventDefault();">Terms & Conditions</span>.</label>
+    </div>
+
     <button class="sync-btn" id="authBtn" onclick="handleAuthSubmit()">Access Account</button>
     
     <p style="margin-top: 15px; font-size: 14px; color: #7a1029; cursor: pointer; text-decoration: underline; font-weight: bold;" id="forgotPassBtn" onclick="openForgotPasswordModal()">Forgot Password?</p>
@@ -439,6 +446,22 @@
         </div>
     </div>
 </div>
+
+<!-- Terms and Conditions Modal -->
+<div id="termsModal" class="modal-overlay">
+    <div class="modal-box" style="width: 400px; max-width: 90%; background: #fdf8ef;">
+        <h3 style="margin: 0 0 15px 0; color: #7a1029;">📜 Terms & Conditions</h3>
+        <div style="background: white; border: 1px solid #e6c7c3; padding: 15px; border-radius: 8px; height: 250px; overflow-y: auto; text-align: left; font-size: 12px; color: #334155; line-height: 1.5; margin-bottom: 20px;">
+            <p><strong>1. Acceptance of Terms:</strong> By creating an account on Dipsum, you agree to abide by these terms. If you do not agree, do not use the service.</p>
+            <p><strong>2. User Conduct:</strong> You agree not to use this service to transmit any unlawful, harassing, abusive, threatening, harmful, or objectionable material. The administrator reserves the right to terminate accounts violating this rule without notice.</p>
+            <p><strong>3. Privacy & Security:</strong> While Dipsum employs end-to-end encryption for specific messages, you are solely responsible for maintaining the confidentiality of your account, password, and Recovery ID.</p>
+            <p><strong>4. Disclaimer of Warranties:</strong> This service is provided "as is" without any warranties. The creator is not responsible for any data loss, server downtime, or compromised messages.</p>
+            <p><strong>5. Data Retention:</strong> The server actively automatically clears old data to maintain performance. You acknowledge that your data is not guaranteed to be stored indefinitely.</p>
+            <p><strong>6. Liability:</strong> Under no circumstances shall the developer of Dipsum be liable for any direct, indirect, incidental, or consequential damages resulting from the use or inability to use the service.</p>
+        </div>
+        <button class="sync-btn" style="background: #aad052; color: white;" onclick="document.getElementById('termsModal').classList.remove('active')">Close & Continue</button>
+    </div>
+</div>
     
 <script>
     const backendBaseUrl = 'https://myfirstwebapp-production-82df.up.railway.app';
@@ -544,6 +567,10 @@
         document.getElementById('authBtn').innerText = isSignUpMode ? "Register & Join" : "Access Account";
         document.getElementById('toggleText').innerText = isSignUpMode ? "Already have an account?" : "Need an account?";
         document.getElementById('toggleLink').innerText = isSignUpMode ? "Log In here" : "Create one here";
+        
+        // Hide "Forgot Password" and Show "T&C Checkbox" during Sign Up
+        document.getElementById('forgotPassBtn').style.display = isSignUpMode ? 'none' : 'block';
+        document.getElementById('tncContainer').style.display = isSignUpMode ? 'flex' : 'none';
     }
 
     function handleAuthSubmit() {
@@ -551,12 +578,17 @@
         const pass = document.getElementById('passwordInput').value.trim();
         if (!user || !pass) return displaySystemAlert("Missing Info", "Fill both fields.", "🚫");
 
+        // NEW: Enforce Terms and Conditions
+        if (isSignUpMode && !document.getElementById('tncCheckbox').checked) {
+            return displaySystemAlert("Agreement Required", "You must read and agree to the Terms & Conditions to create an account.", "📜");
+        }
+
         const btn = document.getElementById('authBtn');
-        if (btn.disabled) return; // Prevent double-taps
+        if (btn.disabled) return; 
         
         const initialText = btn.innerText;
         btn.innerText = "Processing...";
-        btn.disabled = true; // Lock the button
+        btn.disabled = true; 
 
         let targetUrl = `${backendBaseUrl}/api/${isSignUpMode ? 'register' : 'login'}?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
         
@@ -567,20 +599,20 @@
             })
             .then(data => {
                 btn.innerText = initialText;
-                btn.disabled = false; // Unlock the button
+                btn.disabled = false; 
                 
                 if (data.startsWith("SUCCESS")) {
                     document.getElementById('systemAlertModal').classList.remove('active'); 
                     if (isSignUpMode) {
                         displaySystemAlert("Success", "Account created!", "✨");
                         toggleAuthMode();
+                        document.getElementById('tncCheckbox').checked = false; // Reset checkbox
                     } else {
                         localStorage.setItem('dipsum_logged_user', user.toLowerCase());
                         document.getElementById('loginCard').style.display = 'none';
                         document.getElementById('chatLounge').style.display = 'flex';
                         document.getElementById('currentProfileName').innerText = user.toLowerCase();
                         
-                        // Isolate these calls so they NEVER trigger the Offline alert!
                         try { startAppSynchronization(); } catch (e) { console.error(e); }
                         try { 
                             if (typeof setupPushNotifications === 'function') {
@@ -593,7 +625,6 @@
                 }
             })
             .catch((error) => {
-                // This will now ONLY trigger if the server is actually down!
                 console.error("Login Error:", error);
                 btn.innerText = initialText;
                 btn.disabled = false; 
