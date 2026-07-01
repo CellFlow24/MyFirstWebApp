@@ -236,12 +236,15 @@
     <input type="text" id="usernameInput" placeholder="Enter Username" class="login-field">
     <input type="password" id="passwordInput" placeholder="Enter Password" class="login-field">
     <button class="sync-btn" id="authBtn" onclick="handleAuthSubmit()">Access Account</button>
-    <p style="margin-top: 20px; font-size: 18px; color: #b31e41;">
+    
+    <p style="margin-top: 15px; font-size: 14px; color: #7a1029; cursor: pointer; text-decoration: underline; font-weight: bold;" id="forgotPassBtn" onclick="openForgotPasswordModal()">Forgot Password?</p>
+    
+    <p style="margin-top: 15px; font-size: 18px; color: #b31e41;">
         <span id="toggleText">Need an account?</span>
         <span id="toggleLink" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" onclick="toggleAuthMode()">Create one here</span>
     </p>
 </div>
-
+    
 <div id="chatLounge" class="lounge-container" style="display: none;">
     <div class="lounge-sidebar">
         <div class="profile-section" style="display: flex; align-items: center; gap: 12px; padding: 10px; position: relative;">
@@ -255,7 +258,7 @@
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <h3 id="currentProfileName" style="font-weight: bold; font-size: 18px; color: #334155; margin: 0;">Username</h3>
-                    <span id="userRecoveryId" style="background: #e6c7c3; color: #7a1029; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; border: 1px solid #fb9fa3;">#XXXXX</span>
+                    <span id="userRecoveryId" onclick="revealAndCopyRecoveryId()" style="background: #e6c7c3; color: #7a1029; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; border: 1px solid #fb9fa3; cursor: pointer; transition: all 0.3s ease;" title="Tap to reveal and copy">#XXXXX</span>
                 </div>
                 <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                     <button onclick="openMomentCreator()" style="background: #fb9fa3; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">📢 Moments</button>
@@ -417,6 +420,22 @@
         <div class="modal-actions">
             <button class="btn-decline" onclick="executeConfirmedAction(true)" style="background: #e11d48; color: white;" id="actionConfirmBtn">Yes, Do it</button>
             <button class="btn-accept" onclick="executeConfirmedAction(false)" style="background: #94a3b8; color: white;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="forgotPasswordModal" class="modal-overlay">
+    <div class="modal-box" style="background: #fdf8ef;">
+        <div style="font-size: 35px; margin-bottom: 10px;">🔑</div>
+        <h3 style="margin: 0 0 10px 0; color: #7a1029;">Account Recovery</h3>
+        <p style="margin: 0 0 20px 0; font-size: 13px; color: #555;">Enter your Username and your unique Recovery #ID to reset your password.</p>
+        
+        <input type="text" id="recoverUsernameInput" placeholder="Enter Username" class="login-field" style="margin-bottom: 8px; color: #334155; background: white; border: 1px solid #aad052;">
+        <input type="text" id="recoverIdInput" placeholder="Enter #ID (e.g. #A1B2C)" class="login-field" style="margin-bottom: 20px; color: #334155; background: white; border: 1px solid #aad052;">
+        
+        <div class="modal-actions">
+            <button class="btn-accept" onclick="submitPasswordRecovery()" style="background: #aad052; color: white;">Recover</button>
+            <button class="btn-decline" onclick="closeForgotPasswordModal()" style="background: #94a3b8; color: white;">Cancel</button>
         </div>
     </div>
 </div>
@@ -1698,15 +1717,51 @@
     
     // --- CONNECTED SETTINGS & SECURITY LOGIC ---
     
+    // --- SECURE RECOVERY ID LOGIC ---
+    let actualRecoveryId = "";
+
     function fetchAndDisplayRecoveryId() {
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         fetch(`${backendBaseUrl}/api/getRecoveryId?user=${encodeURIComponent(user)}`)
             .then(res => res.text())
             .then(id => {
                 if (id !== "NONE") {
-                    document.getElementById('userRecoveryId').innerText = id;
+                    actualRecoveryId = id; // Store it safely in background memory
+                    document.getElementById('userRecoveryId').innerText = "#XXXXX"; // Keep the screen masked
                 }
             });
+    }
+
+    function revealAndCopyRecoveryId() {
+        if (!actualRecoveryId) return; // Prevent action if not loaded yet
+        
+        const badge = document.getElementById('userRecoveryId');
+        if (badge.innerText === "Copied!") return; // Prevent spam clicking
+        
+        // Copy to device clipboard
+        navigator.clipboard.writeText(actualRecoveryId).then(() => {
+            // Visual feedback
+            badge.innerText = "Copied!";
+            badge.style.background = "#22c55e"; // Success Green
+            badge.style.color = "white";
+            
+            // Show the actual ID after 1 second
+            setTimeout(() => {
+                badge.innerText = actualRecoveryId;
+                badge.style.background = "#e6c7c3"; // Revert to original color
+                badge.style.color = "#7a1029";
+                
+                // Securely mask it again after 4 seconds
+                setTimeout(() => {
+                    badge.innerText = "#XXXXX";
+                }, 4000);
+                
+            }, 1000);
+        }).catch(() => {
+            // Fallback just in case a specific mobile browser blocks the clipboard
+            badge.innerText = actualRecoveryId;
+            setTimeout(() => { badge.innerText = "#XXXXX"; }, 4000);
+        });
     }
 
     function submitPasswordChange() {
@@ -1790,6 +1845,56 @@
         
         pendingActionType = null;
         pendingActionTarget = null;
+    }
+
+    // --- ACCOUNT RECOVERY LOGIC ---
+    function openForgotPasswordModal() {
+        document.getElementById('recoverUsernameInput').value = '';
+        document.getElementById('recoverIdInput').value = '';
+        document.getElementById('forgotPasswordModal').classList.add('active');
+    }
+
+    function closeForgotPasswordModal() {
+        document.getElementById('forgotPasswordModal').classList.remove('active');
+    }
+
+    function submitPasswordRecovery() {
+        const user = document.getElementById('recoverUsernameInput').value.trim();
+        const recId = document.getElementById('recoverIdInput').value.trim();
+        
+        if (!user || !recId) return displaySystemAlert("Missing Info", "Please enter both Username and Recovery #ID.", "🚫");
+        if (!recId.startsWith('#')) return displaySystemAlert("Invalid Format", "Your Recovery ID must start with a # symbol.", "⚠️");
+
+        const btn = document.querySelector('#forgotPasswordModal .btn-accept');
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.disabled = true;
+
+        fetch(`${backendBaseUrl}/api/recoverAccount?user=${encodeURIComponent(user)}&recoveryId=${encodeURIComponent(recId)}`)
+            .then(res => res.text())
+            .then(data => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                
+                if (data.startsWith("SUCCESS")) {
+                    closeForgotPasswordModal();
+                    
+                    // Display the temporary password returned from the Java backend
+                    let displayMessage = data.replace("SUCCESS: ", "") + "\n\nLog in now and check your messages from 'Help'!";
+                    displaySystemAlert("Account Recovered!", displayMessage, "✨");
+                    
+                    // Auto-fill the username so they just have to type the temporary password
+                    document.getElementById('usernameInput').value = user;
+                    document.getElementById('passwordInput').value = '';
+                } else {
+                    displaySystemAlert("Recovery Failed", "Invalid Username or Recovery #ID.", "❌");
+                }
+            })
+            .catch(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                displaySystemAlert("Offline", "Could not connect to backend.", "📡");
+            });
     }
 
     
