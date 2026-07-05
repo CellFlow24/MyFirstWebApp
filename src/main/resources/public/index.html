@@ -677,6 +677,9 @@
             });
     }
 
+    // --- BOLD FEATURE: THE INTERRUPT LOGIC ---
+    let interruptTimer; // Tracks the 3-second auto-close
+
     function triggerLocalInterrupt(avatarChoice) {
         const overlay = document.getElementById('interruptOverlay');
         const imgTag = document.getElementById('interruptAvatarImg');
