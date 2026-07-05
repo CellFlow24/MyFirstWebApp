@@ -1611,6 +1611,7 @@
 
     let capsuleQueue = [];
     let isCapsulePlaying = false;
+    let typingTimeout; // Tracks the typing so we can stop it if they close early
 
     function triggerCapsuleOverlay(sender, text) {
         capsuleQueue.push({sender, text});
@@ -1624,27 +1625,61 @@
         let cap = capsuleQueue.shift();
         const overlay = document.getElementById('capsuleDisplayOverlay');
         document.getElementById('capsuleSenderName').innerText = capitalizeFirstLetter(cap.sender);
-        document.getElementById('capsuleRevealedText').innerHTML = cap.text;
         
-        // Optional: Native device vibration for dramatic effect
+        const textBox = document.getElementById('capsuleRevealedText');
+        textBox.innerHTML = ""; // Clear it for the typing effect
+        
         if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
         
         overlay.style.display = 'flex';
-        // Tiny delay allows CSS transitions to catch the DOM change
+        
         setTimeout(() => {
             overlay.classList.add('visible');
             overlay.classList.add('open');
+            
+            // --- THE SLOW BURN TYPING EFFECT ---
+            let i = 0;
+            let isTag = false;
+            let currentHTML = "";
+            let rawString = cap.text;
+            
+            function typeWriter() {
+                if (i < rawString.length) {
+                    let char = rawString.charAt(i);
+                    currentHTML += char;
+                    
+                    // Add a blinking cursor while typing
+                    textBox.innerHTML = currentHTML + '<span style="border-right: 2px solid #7a1029; margin-left: 2px;"></span>';
+                    i++;
+                    
+                    // Skip delays if we are rendering an HTML tag like <br>
+                    if (char === '<') isTag = true;
+                    if (char === '>') isTag = false;
+                    
+                    // Randomize the speed slightly to mimic human typing (30ms to 80ms)
+                    let typingSpeed = isTag ? 0 : Math.floor(Math.random() * 50) + 30; 
+                    
+                    typingTimeout = setTimeout(typeWriter, typingSpeed);
+                } else {
+                    textBox.innerHTML = currentHTML; // Remove cursor when done
+                }
+            }
+            
+            // Wait for the envelope to pop up before starting to type (800ms)
+            setTimeout(typeWriter, 800);
+            
         }, 50);
     }
 
     function closeCapsuleOverlay() {
+        clearTimeout(typingTimeout); // Stop the typing effect if closed early
         const overlay = document.getElementById('capsuleDisplayOverlay');
         overlay.classList.remove('visible');
         overlay.classList.remove('open');
         setTimeout(() => {
             overlay.style.display = 'none';
             isCapsulePlaying = false;
-            playNextCapsule(); // Play next if multiple unlocked at once
+            playNextCapsule(); 
         }, 1000);
     }
 
