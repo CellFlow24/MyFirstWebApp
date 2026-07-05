@@ -245,16 +245,16 @@
             opacity: 1;
         }
 
-        .steamy-handprint-svg {
-            width: 80%; /* Adjust size for mobile screens */
-            max-width: 400px;
-            color: #f59e0b; /* The base amber-gold color from the visualization */
-            filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.9)); /* The soft, intense glow */
-            animation: handprintFadeIn 0.8s ease-out forwards; /* Simple pop-in animation */
+        .interrupt-pop-image {
+            width: 80%; 
+            max-width: 300px;
+            object-fit: contain;
+            filter: drop-shadow(0 15px 25px rgba(0,0,0,0.5)); 
+            animation: avatarPopIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; 
         }
 
-        @keyframes handprintFadeIn {
-            0% { opacity: 0; transform: scale(0.7) translateY(20px); }
+        @keyframes avatarPopIn {
+            0% { opacity: 0; transform: scale(0.5) translateY(50px); }
             100% { opacity: 1; transform: scale(1) translateY(0); }
         }
         
@@ -357,6 +357,12 @@
         <input type="password" id="settingOldPass" placeholder="Current Password" class="login-field" style="margin-bottom: 8px; padding: 10px;">
         <input type="password" id="settingNewPass" placeholder="New Password" class="login-field" style="padding: 10px;">
         <button class="sync-btn" style="padding: 10px; font-size: 13px; margin-bottom: 20px;" onclick="submitPasswordChange()">Update Password</button>
+
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">🔥 Interrupt Avatar</h4>
+        <select id="settingInterruptAvatar" class="login-field" style="padding: 10px; margin-bottom: 20px; color: #334155; background: white; border: 1px solid #aad052;" onchange="saveInterruptPreference()">
+            <option value="boy">Boy Avatar</option>
+            <option value="girl">Girl Avatar</option>
+        </select>
 
         <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">💔 Manage Connections</h4>
         <div id="settingsConnectionsList" style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 10px; max-height: 120px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #e6c7c3;">
@@ -499,12 +505,7 @@
 
 <!-- The 'Interrupt' Steamy Handprint Overlay -->
 <div id="interruptOverlay" class="interrupt-steamy-glass">
-    <!-- This SVG defines the realistic handprint silhouette and its soft glow -->
-    <svg class="steamy-handprint-svg" viewbox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-        <path d="M50 85 C55 85 58 82 58 78 C58 75 56 73 53 71 L51 70 C48 68 46 66 46 63 C46 60 49 57 52 57 C55 57 58 60 58 63" fill="none" stroke="currentColor" stroke-width="2" class="glow-path"/>
-        <circle cx="50" cy="35" r="8" fill="currentColor" class="glow-core"/>
-        <ellipse cx="50" cy="55" rx="15" ry="20" fill="currentColor" class="glow-palm"/>
-    </svg>
+    <img id="interruptAvatarImg" src="boy.png" alt="Interrupt" class="interrupt-pop-image">
 </div>
     
 <script>
@@ -676,27 +677,25 @@
             });
     }
 
-    // --- BOLD FEATURE: THE INTERRUPT LOGIC ---
-    let interruptTimer; // Tracks the 3-second auto-close
-
-    // 1. This function is called when a partner hits the (future) Interrupt button
-    function triggerLocalInterrupt() {
-        // Find the overlay element and add the .active class to fade it in
+    function triggerLocalInterrupt(avatarChoice) {
         const overlay = document.getElementById('interruptOverlay');
+        const imgTag = document.getElementById('interruptAvatarImg');
+        
+        // Set the image dynamically based on the payload!
+        imgTag.src = avatarChoice === 'girl' ? 'girll.png' : 'boy.png';
+        
         overlay.classList.add('active');
         
-        // --- ADD HAPTIC FEEDBACK ---
-        // Mimic Concept A: A long, heavy vibration. It feels tactile.
-        if (navigator.vibrate) {
-            navigator.vibrate(1200); // 1.2 seconds of intense buzz
-        }
+        // Re-trigger CSS animation by resetting the element
+        imgTag.style.animation = 'none';
+        void imgTag.offsetWidth; 
+        imgTag.style.animation = 'avatarPopIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+
+        if (navigator.vibrate) navigator.vibrate([200, 100, 400]); // Custom bold vibration pattern
         
-        // 2. Clear any previous timers to prevent early closings
         clearTimeout(interruptTimer);
-        
-        // 3. Set a new timer to automatically clear the screen after 3 seconds
         interruptTimer = setTimeout(() => {
-            overlay.classList.remove('active'); // Fade it back out
+            overlay.classList.remove('active'); 
         }, 3000); 
     }
 
@@ -1155,14 +1154,17 @@
                                     }
                                 }
                             }
-                        } else if (text.trim() === "[SYSTEM_INTERRUPT]") {
+                        } else if (text.trim().startsWith("[SYSTEM_INTERRUPT:")) {
                             isInterrupt = true;
+                            // Extract the 'boy' or 'girl' variable from the token
+                            let attachedAvatar = text.replace("[SYSTEM_INTERRUPT:", "").replace("]", "").trim();
+                            
                             if (sender !== currentUser && timestampMs > 0) {
                                 let intStorageKey = "interrupt_played_" + timestampMs;
                                 if (!localStorage.getItem(intStorageKey)) {
                                     localStorage.setItem(intStorageKey, "true");
                                     if (!triggeredHeartbeatThisCycle) { 
-                                        setTimeout(triggerLocalInterrupt, 500);
+                                        setTimeout(() => triggerLocalInterrupt(attachedAvatar), 500);
                                         triggeredHeartbeatThisCycle = true;
                                     }
                                 }
@@ -1599,14 +1601,17 @@
         const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
         if(!activeChatTarget) return;
 
+        // Pull the user's preference (defaults to 'boy')
+        let myAvatar = localStorage.getItem('dipsum_interrupt_avatar') || 'boy';
         let roomKey = [user, activeChatTarget].sort().join('#');
-        // Encrypt the interrupt token so it is hidden in the database
-        let securePayload = encryptE2E("[SYSTEM_INTERRUPT]", roomKey);
+        
+        // Attach the avatar choice to the token!
+        let securePayload = encryptE2E(`[SYSTEM_INTERRUPT:${myAvatar}]`, roomKey);
 
         fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
         }).then(() => {
-            triggerLocalInterrupt(); // Flash it on your own screen so you know it sent!
+            triggerLocalInterrupt(myAvatar); // Flash it on your own screen!
             fetchActiveChatMessages(user, activeChatTarget);
         });
     }
@@ -1848,6 +1853,7 @@
         // Clear password fields
         document.getElementById('settingOldPass').value = '';
         document.getElementById('settingNewPass').value = '';
+        document.getElementById('settingInterruptAvatar').value = localStorage.getItem('dipsum_interrupt_avatar') || 'boy';
         
         populateSettingsConnections();
     }
@@ -1878,6 +1884,11 @@
     // Placeholder functions for Step 2
     function submitPasswordChange() {
         displaySystemAlert("Coming Soon", "The security update will be active in Step 2!", "⏳");
+    }
+
+    function saveInterruptPreference() {
+        const choice = document.getElementById('settingInterruptAvatar').value;
+        localStorage.setItem('dipsum_interrupt_avatar', choice);
     }
     
     // --- CONNECTED SETTINGS & SECURITY LOGIC ---
