@@ -359,10 +359,11 @@
         <button class="sync-btn" style="padding: 10px; font-size: 13px; margin-bottom: 20px;" onclick="submitPasswordChange()">Update Password</button>
 
         <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">🔥 Interrupt Avatar</h4>
-        <select id="settingInterruptAvatar" class="login-field" style="padding: 10px; margin-bottom: 20px; color: #334155; background: white; border: 1px solid #aad052;" onchange="saveInterruptPreference()">
-            <option value="boy">Boy Avatar</option>
-            <option value="girl">Girl Avatar</option>
-        </select>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <button id="btnAvatarBoy" onclick="setInterruptAvatar('boy')" style="flex: 1; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; border: 2px solid #aad052; background: #aad052; color: white;">👦 Boy</button>
+            <button id="btnAvatarGirl" onclick="setInterruptAvatar('girl')" style="flex: 1; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; border: 2px solid #aad052; background: transparent; color: #aad052;">👧 Girl</button>
+        </div>
+        <input type="hidden" id="settingInterruptAvatar" value="boy">
 
         <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #7a1029;">💔 Manage Connections</h4>
         <div id="settingsConnectionsList" style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 10px; max-height: 120px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #e6c7c3;">
@@ -375,7 +376,7 @@
         </div>
     </div>
 </div>
-
+    
 <div id="momentViewerOverlay">
     <div class="moment-viewer-header">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -1856,9 +1857,29 @@
         // Clear password fields
         document.getElementById('settingOldPass').value = '';
         document.getElementById('settingNewPass').value = '';
-        document.getElementById('settingInterruptAvatar').value = localStorage.getItem('dipsum_interrupt_avatar') || 'boy';
+        
+        // Load the saved Avatar preference into the custom buttons
+        let savedAvatar = localStorage.getItem('dipsum_interrupt_avatar') || 'boy';
+        setInterruptAvatar(savedAvatar);
         
         populateSettingsConnections();
+    }
+
+    // NEW: Controls the custom Avatar buttons
+    function setInterruptAvatar(choice) {
+        document.getElementById('settingInterruptAvatar').value = choice;
+        localStorage.setItem('dipsum_interrupt_avatar', choice);
+        
+        const btnBoy = document.getElementById('btnAvatarBoy');
+        const btnGirl = document.getElementById('btnAvatarGirl');
+        
+        if (choice === 'boy') {
+            btnBoy.style.background = '#aad052'; btnBoy.style.color = 'white';
+            btnGirl.style.background = 'transparent'; btnGirl.style.color = '#aad052';
+        } else {
+            btnGirl.style.background = '#aad052'; btnGirl.style.color = 'white';
+            btnBoy.style.background = 'transparent'; btnBoy.style.color = '#aad052';
+        }
     }
 
     function populateSettingsConnections() {
