@@ -1011,6 +1011,8 @@
                         </div>
                         
                         <div id="loungePetContainer" style="margin-left: 15px; font-size: 22px; transition: transform 0.3s; cursor: pointer;" title="Lounge Pet">💤🧸</div>
+                        
+                        <div onclick="sendInterrupt()" style="margin-left: 15px; font-size: 22px; cursor: pointer; transition: transform 0.2s; filter: drop-shadow(0 0 5px rgba(245,158,11,0.5));" title="Interrupt Partner" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔥</div>
 
                         <div style="margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #15803d; background: #dcfce7; padding: 4px 8px; border-radius: 12px; font-weight: 600; animation: pulseGlow 3s infinite;">
                             <span>🔐</span> E2E Encrypted
@@ -1137,18 +1139,30 @@
 
                         text = decryptE2E(text, roomKey);
 
-                        // -- UPDATED: Heartbeat Intercept with Offline/Persistence Logic --
+                        // -- SYSTEM MESSAGE INTERCEPTS (Heartbeat & Interrupt) --
                         let isHeartbeat = false;
+                        let isInterrupt = false;
+                        
                         if (text.trim() === "[SYSTEM_HEARTBEAT]") {
                             isHeartbeat = true;
                             if (sender !== currentUser && timestampMs > 0) {
                                 let hbStorageKey = "heartbeat_played_" + timestampMs;
-                                // If this heartbeat hasn't been played on this device yet
                                 if (!localStorage.getItem(hbStorageKey)) {
                                     localStorage.setItem(hbStorageKey, "true");
-                                    // Fire the animation! Limit to 1 per load cycle so it doesn't spam if they missed 5 heartbeats
                                     if (!triggeredHeartbeatThisCycle) {
                                         setTimeout(triggerHeartbeatAnimation, 500);
+                                        triggeredHeartbeatThisCycle = true;
+                                    }
+                                }
+                            }
+                        } else if (text.trim() === "[SYSTEM_INTERRUPT]") {
+                            isInterrupt = true;
+                            if (sender !== currentUser && timestampMs > 0) {
+                                let intStorageKey = "interrupt_played_" + timestampMs;
+                                if (!localStorage.getItem(intStorageKey)) {
+                                    localStorage.setItem(intStorageKey, "true");
+                                    if (!triggeredHeartbeatThisCycle) { 
+                                        setTimeout(triggerLocalInterrupt, 500);
                                         triggeredHeartbeatThisCycle = true;
                                     }
                                 }
@@ -1200,7 +1214,7 @@
                         }
 
                         let isJumboEmoji = false;
-                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText && !isHeartbeat && !isCapsule) {
+                        if (!stickerPath && !text.startsWith("IMG_ATTACHMENT_DATA:") && !quotedText && !isHeartbeat && !isInterrupt && !isCapsule) {
                             try {
                                 const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
                                 if (text.trim().length > 0 && text.length <= 20 && emojiRegex.test(text)) isJumboEmoji = true;
@@ -1234,7 +1248,7 @@
                             bubble.style.background = "transparent"; bubble.style.padding = "0";
                         } else { bubble.innerHTML = text; }
 
-                        if (quotedText && !isHeartbeat) {
+                        if (quotedText && !isHeartbeat && !isInterrupt) {
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'msg-quoted';
                             quoteDiv.innerText = quotedText;
@@ -1245,12 +1259,13 @@
                         const bubbleRow = document.createElement('div');
                         bubbleRow.style.display = 'flex'; bubbleRow.style.alignItems = 'center'; bubbleRow.style.maxWidth = "100%";
 
-                        if (isHeartbeat) {
+                        if (isHeartbeat || isInterrupt) {
                             bubbleWrapper.style.alignItems = "center";
                             bubbleWrapper.style.alignSelf = "center";
-                            bubble.innerHTML = sender === currentUser ? "<i>💖 You sent a heartbeat</i>" : `<i>💖 ${capitalizeFirstLetter(sender)} sent a heartbeat</i>`;
+                            let actionText = isHeartbeat ? "💖 sent a heartbeat" : "🔥 triggered an interrupt";
+                            bubble.innerHTML = sender === currentUser ? `<i>You ${actionText}</i>` : `<i>${capitalizeFirstLetter(sender)} ${actionText}</i>`;
                             bubble.style.background = "transparent"; bubble.style.boxShadow = "none";
-                            bubble.style.color = "#d946ef"; bubble.style.fontSize = "12px"; bubble.style.padding = "4px";
+                            bubble.style.color = isHeartbeat ? "#d946ef" : "#f59e0b"; bubble.style.fontSize = "12px"; bubble.style.padding = "4px";
                             bubbleRow.appendChild(bubble);
                         } else {
                             const replyBtn = document.createElement('button');
@@ -1267,7 +1282,7 @@
                         const metaContainer = document.createElement('div');
                         metaContainer.style.cssText = 'display: flex; align-items: center; margin-top: 2px; padding: 0 4px;';
                         metaContainer.style.justifyContent = (sender === currentUser) ? 'flex-end' : 'flex-start';
-                        if(isHeartbeat) metaContainer.style.justifyContent = 'center';
+                        if(isHeartbeat || isInterrupt) metaContainer.style.justifyContent = 'center';
 
                         const timeSpan = document.createElement('span');
                         timeSpan.style.cssText = 'font-size: 10px; color: #7a1029; opacity: 0.7; font-weight: 500; margin-right: 5px;';
@@ -1576,6 +1591,22 @@
             method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
         }).then(() => {
             triggerHeartbeatAnimation(); // Flash it on your screen too!
+            fetchActiveChatMessages(user, activeChatTarget);
+        });
+    }
+
+    function sendInterrupt() {
+        const user = document.getElementById('currentProfileName').innerText.trim().toLowerCase();
+        if(!activeChatTarget) return;
+
+        let roomKey = [user, activeChatTarget].sort().join('#');
+        // Encrypt the interrupt token so it is hidden in the database
+        let securePayload = encryptE2E("[SYSTEM_INTERRUPT]", roomKey);
+
+        fetch(`${backendBaseUrl}/api/sendMessage?from=${encodeURIComponent(user)}&to=${encodeURIComponent(activeChatTarget)}`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: securePayload
+        }).then(() => {
+            triggerLocalInterrupt(); // Flash it on your own screen so you know it sent!
             fetchActiveChatMessages(user, activeChatTarget);
         });
     }
